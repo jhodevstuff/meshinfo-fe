@@ -1,0 +1,35 @@
+@import './base.css';
+
+body {
+  background: #1c1e21;
+  color: rgb(255, 255, 255);
+  transition: color 0.5s, background-color 0.5s;
+  line-height: 1;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  /* font-family: 'Space Mono'; */
+  /* font-family: 'DIN Alternate'; */
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: #fff;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  a:hover {
+    /* background-color: hsla(160, 100%, 37%, 0.2); */
+  }
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (min-width: 429px) {
+}
+
+@media (min-width: 1080px) {
+}
