@@ -1,5 +1,9 @@
 @import './base.css';
 
+html {
+  background-color: #1c1e21;
+}
+
 body {
   background: #1c1e21;
   color: rgb(255, 255, 255);
