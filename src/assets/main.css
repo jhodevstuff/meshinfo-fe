@@ -1,11 +1,11 @@
 @import './base.css';
 
 html {
-  background-color: #1c1e21;
+  background: #181818;
 }
 
 body {
-  background: #1c1e21;
+  background: #181818;
   color: rgb(255, 255, 255);
   transition: color 0.5s, background-color 0.5s;
   line-height: 1;

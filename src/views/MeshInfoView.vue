@@ -1,16 +1,30 @@
 <template>
   <div>
-    <div class="nodes">
+    <div class="nodes" v-if="selectedMasterNode">
       <div class="nodes__info">
-        <p class="nodes__info--total">Nodes gesamt: {{ meshDataStore.data.knownNodes.length }}</p>
+        <p class="nodes__info--total">Nodes gesamt: {{ meshDataStore.data[selectedMasterNode].knownNodes.length }}</p>
         <div class="nodes__info--update">
           <p>{{ elapsedSeconds }}</p>
           <p>Sekunden seit Update {{ elapsedSeconds > 3600 ? '🧐' : null }}</p>
         </div>
       </div>
+      <div class="master-nodes" v-if="enableMasters">
+        <div class="master-nodes__container">
+          <div class="master-nodes__option"
+            :class="(selectedMasterNode == masterNode && meshDataStore.nodesIndex.length > 1) && 'master-nodes__selected'"
+            v-for="masterNode in meshDataStore.nodesIndex" :key="masterNode" @click="selectMasterNode(masterNode)">
+            <p class="master-nodes__option--label">
+              {{ masterNode }}
+              ({{ meshDataStore.data[masterNode]?.knownNodes?.[0]?.shortName || '---' }})
+            </p>
+          </div>
+        </div>
+      </div>
       <div class="nodes__list">
-        <div class="node" v-for="node in meshDataStore.data.knownNodes" :key="node.id" @click="selectNode(node.id)">
-          <div v-if="node.id !== meshDataStore.data.info.infoFrom" :class="['node__online', getNodeStatus(node)]"></div>
+        <div class="node" v-for="node in meshDataStore.data[selectedMasterNode].knownNodes" :key="node.id"
+          @click="selectNode(node.id)">
+          <div v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
+            :class="['node__online', getNodeStatus(node)]"></div>
           <div class="node__icon">
             <div v-if="nodeImages.includes(node.model)" class="node__icon--img"
               :style="'background-image: url(src/assets/devices/' + node.model + '.png)'"></div>
@@ -21,7 +35,8 @@
           <div class="node__info">
             <div class="node__info--block">
               <p class="bold large">{{ node.id }}</p>
-              <p v-if="node.id === meshDataStore.data.info.infoFrom" class="bold superlarge righttop">🛸</p>
+              <p v-if="node.id === meshDataStore.data[selectedMasterNode].info.infoFrom"
+                class="bold superlarge lefttop">🛸</p>
             </div>
             <div class="node__info--block">
               <p>👔 {{ node.longName }}</p>
@@ -39,7 +54,8 @@
             </div>
             <div class="node__info--block" v-if="node.snr || node.hops">
               <p v-if="node.snr">📡 {{ node.snr }} dB</p>
-              <p v-if="node.id !== meshDataStore.data.info.infoFrom">🦘 {{ node.hops }} {{ node.hops === 1 ? 'Hop' : 'Hops' }}</p>
+              <p v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom">🦘 {{ node.hops }} {{ node.hops
+                === 1 ? 'Hop' : 'Hops' }}</p>
             </div>
             <div class="node__info--block" v-if="node.lat && node.lon">
               <p>
@@ -87,7 +103,14 @@ const elapsedSeconds = ref(0);
 const traceRoutesVisible = ref(false);
 let intervalId;
 const selectedTraceRoute = ref([]);
+const selectedMasterNode = ref(useMeshDataStore().nodesIndex[0]);
+const enableMasters = ref(false);
 const nodeImages = ref(['HELTEC_V3', 'TBEAM', 'T_ECHO', 'T_DECK', 'TRACKER_T1000_E']);
+
+const selectMasterNode = (nodeId) => {
+  selectedMasterNode.value = nodeId;
+  localStorage.setItem('masterNode', nodeId);
+}
 
 const copy = (copyValue) => {
   navigator.clipboard.writeText(copyValue)
@@ -98,10 +121,11 @@ const toggleTraceRoutes = () => {
 };
 
 const selectNode = (nodeId) => {
-  meshDataStore.data.traceroutes.forEach((tr) => {
+  meshDataStore.data[selectedMasterNode.value].traceroutes.forEach((tr) => {
     if (tr.nodeId === nodeId) {
       selectedTraceRoute.value = tr.traces;
       traceRoutesVisible.value = true;
+      window.scrollTo(0, 0);
     }
   });
 };
@@ -109,16 +133,20 @@ const selectNode = (nodeId) => {
 const formatRoute = (nodeIds) => {
   return nodeIds
     .map(id => {
-      const node = meshDataStore.data.knownNodes.find(n => n.id === id);
+      const node = meshDataStore.data[selectedMasterNode.value].knownNodes.find(n => n.id === id);
       return node ? `${id} (${node.shortName})` : id;
     })
     .join(" → ");
 }
 
 const getNodeStatus = (node) => {
+  const colorStatesHours = {
+    green: 1.5,
+    orange: 6
+  }
   const oneHour = 60 * 60 * 1000;
-  const recent = 1.5 * oneHour;
-  const long = 6 * oneHour;
+  const recent = colorStatesHours.green * oneHour;
+  const long = colorStatesHours.orange * oneHour;
   const currentTime = Date.now();
   const lastHeardTime = node.lastHeard ? node.lastHeard * 1000 : null;
   const lastTraceTime = getLastTraceTimestampMillis(node.id);
@@ -133,7 +161,7 @@ const getNodeStatus = (node) => {
 };
 
 const getLastTraceTimestampMillis = (nodeId) => {
-  const traceroute = meshDataStore.data.traceroutes.find(tr => tr.nodeId === nodeId);
+  const traceroute = meshDataStore.data[selectedMasterNode.value].traceroutes.find(tr => tr.nodeId === nodeId);
   if (traceroute && traceroute.traces.length > 0) {
     return traceroute.traces[traceroute.traces.length - 1].timeStamp;
   }
@@ -151,7 +179,7 @@ const formatTimestamp = (timestamp) => {
 }
 
 const getLastTraceTimestamp = (nodeId) => {
-  const traceroute = meshDataStore.data.traceroutes.find(tr => tr.nodeId === nodeId);
+  const traceroute = meshDataStore.data[selectedMasterNode.value].traceroutes.find(tr => tr.nodeId === nodeId);
   if (traceroute && traceroute.traces.length > 0) {
     const lastTimestamp = traceroute.traces[traceroute.traces.length - 1].timeStamp;
     return getTraceTimestamp(lastTimestamp);
@@ -170,7 +198,7 @@ const getTraceTimestamp = (timeStamp) => {
 }
 
 const startTimer = () => {
-  elapsedSeconds.value = Math.floor((Date.now() - meshDataStore.data.info.lastUpdated) / 1000);
+  elapsedSeconds.value = Math.floor((Date.now() - meshDataStore.data[selectedMasterNode.value].info.lastUpdated) / 1000);
   clearInterval(intervalId);
   intervalId = setInterval(() => {
     elapsedSeconds.value++;
@@ -179,9 +207,10 @@ const startTimer = () => {
 
 onMounted(() => {
   startTimer();
+  enableMasters.value = true;
 });
 
-watch(() => meshDataStore.data.info.lastUpdated, startTimer);
+watch(() => meshDataStore.data[selectedMasterNode.value], startTimer);
 onUnmounted(() => clearInterval(intervalId));
 </script>
 
@@ -194,6 +223,7 @@ onUnmounted(() => clearInterval(intervalId));
 
   &__info {
     margin: 12px 0;
+    margin-bottom: 0;
     display: flex;
     justify-content: space-between;
     
@@ -203,7 +233,7 @@ onUnmounted(() => clearInterval(intervalId));
 
     &--update {
       display: flex;
-      gap: 3px;
+      gap: 4px;
     }
   }
 
@@ -226,9 +256,43 @@ onUnmounted(() => clearInterval(intervalId));
   }
 }
 
+.master-nodes {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  flex-direction: column;
+
+  &__container {
+    background-color: rgb(40, 40, 40);
+    padding: 6px 22px;
+    display: flex;
+    justify-content: center;
+    gap: 22px;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  &__option {
+    padding: 12px 0;
+    padding-bottom: 6px;
+    margin-bottom: 3px;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all 300ms ease-in-out;
+
+    &--label {
+      font-weight: normal;
+    }
+  }
+
+  &__selected {
+    border-bottom: 2px solid #fff;
+  }
+}
+
 .node {
   width: calc(100% - 2 * 12px);
-  background-color: rgb(50, 50, 50);
+  background-color: rgb(40, 40, 40);
   display: flex;
   gap: 8px;
   padding: 12px;
@@ -285,7 +349,6 @@ onUnmounted(() => clearInterval(intervalId));
     display: flex;
     flex-direction: column;
     gap: 12px;
-    overflow: hidden;
 
     &--block {
       display: flex;
@@ -316,7 +379,7 @@ onUnmounted(() => clearInterval(intervalId));
   font-size: 10px
 }
 
-.righttop {
+.lefttop {
   position: absolute;
   top: 6px;
   left: 12px;
@@ -327,7 +390,6 @@ onUnmounted(() => clearInterval(intervalId));
   top: 0;
   left: 0;
   width: 100%;
-  height: fit-content;
   min-height: 100%;
   background-color: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(12px);
@@ -337,22 +399,24 @@ onUnmounted(() => clearInterval(intervalId));
   align-items: center;
 
   &__info {
-    padding: 60px 48px;
+    padding: 48px;
     margin: 24px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    width: 100%
+    gap: 24px;
+    width: 100%;
+    min-height: fit-content;
   }
 }
 
 .tr {
   width: 100%;
+  min-height: fit-content;
 
   &__headline {
     font-weight: bold;
     font-size: 20px;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
   }
   
   &__hops {

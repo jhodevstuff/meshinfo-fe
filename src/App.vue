@@ -9,7 +9,7 @@
     <p>Daten werden geladen...</p>
   </div>
   <div class="info">
-    <p>2024-11-12_20-25</p>
+    <p>2024-11-14_19-15</p>
     <p>developed by joshua hoffmann</p>
   </div>
 </template>
