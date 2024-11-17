@@ -9,7 +9,7 @@
     <p>Daten werden geladen...</p>
   </div>
   <div class="info">
-    <p>2024-11-14_19-15</p>
+    <p>2024-11-17_23-35</p>
     <p>developed by joshua hoffmann</p>
   </div>
 </template>
@@ -23,6 +23,7 @@ const meshDataStore = useMeshDataStore();
 
 <style lang="scss" scoped>
 .info {
+  display: none;
   text-align: center;
   margin: 42px 0;
   font-size: 12px;
