@@ -18,7 +18,7 @@
           </div>
         </div>
       </div>
-      <div class="nodes__list">
+      <div class="nodes__list" v-show="settingsStore.viewMode === 'normal'">
         <div class="node" v-for="node in meshDataStore.data[selectedMasterNode].knownNodes" :key="node.id"
           v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)">
           <div v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
@@ -41,8 +41,8 @@
               <p class="bold">{{ node.shortName }}</p>
             </div>
             <div class="node__info--block" v-if="node.batteryLevel || node.voltage">
-              <p v-if="node.batteryLevel">{{ (node.batteryLevel < 35) ? '🪫' : '🔋' }} {{ node.batteryLevel > 100 ? "100"
-                : node.batteryLevel }} %</p>
+              <p v-if="node.batteryLevel">{{ (node.batteryLevel < 35) ? '🪫' : '🔋' }} {{ node.batteryLevel> 100 ? "100"
+                  : node.batteryLevel }} %</p>
               <p v-if="node.voltage <= 0 && node.batteryLevel >= 100">🔌</p>
               <p v-else-if="node.voltage">⚡️ {{ node.voltage >= 0 ? node.voltage : 0 }} V</p>
             </div>
@@ -77,52 +77,83 @@
           </div>
         </div>
       </div>
-      <div class="details" v-if="selectedDetails">
-        <p class="details__headline">{{ selectedDetails }}</p>
-        <div class="close" @click.stop="close"></div>
-        <div v-if="selectedTraceRoute && selectedDetails === 'Traceroutes'">
-          <div v-for="(tr, index) in selectedTraceRoute" :key="index" class="traceroutes">
-            <p class="traceroutes__time">{{ getTraceTimestamp(tr.timeStamp) }} - Tracroute mit {{ tr.hops }} {{ tr.hops
-              === 1 ? 'Hop' : 'Hops' }} {{ tr.hops === 0 ? '(direkt)' : '' }}</p>
-            <div class="traceroutes__row">
-              <p class="traceroutes__row--key">Route Hinweg:</p>
-              <p class="traceroutes__row--value">{{ formatRoute(tr.nodeTraceTo) }}</p>
-            </div>
-            <div class="traceroutes__row">
-              <p class="traceroutes__row--key">Route Rückweg:</p>
-              <p class="traceroutes__row--value">{{ formatRoute(tr.nodeTraceFrom) }}</p>
+      <div class="nodes__list nodes__list--compact" v-show="settingsStore.viewMode === 'compact'">
+        <div class="node node__compact" v-for="node in meshDataStore.data[selectedMasterNode].knownNodes" :key="node.id"
+          v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)">
+          <div v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
+            :class="['node__online node__online--compact', getNodeStatus(node)]">
+          </div>
+          <div class="node__info--block node__info--block__compact">
+            <p>{{ node.longName }}</p>
+            <p class="bold">{{ node.shortName }}</p>
+          </div>
+          <div class="node__actions node__actions--compact"
+            v-if="selectedNode === node.id && nodeOptionsVisible && (node.power.batteryLevel.length > 1 || getLastTraceTimestamp(node.id))">
+            <div class="close close__moremargin" @click.stop="close"></div>
+            <p class="node__actions--headline">Verfügbare Details</p>
+            <div class="node__actions--options node__actions--options__compact">
+              <div class="node__actions--options__item" v-if="getLastTraceTimestamp(node.id)"
+                @click.stop="selectDetails('Traceroutes')">
+                🔭 Traceroutes
+              </div>
+              <div class="node__actions--options__item" v-if="node.power.batteryLevel.length > 1"
+                @click.stop="selectDetails('Batteriestand')">
+                {{ (node.batteryLevel < 35) ? '🪫' : '🔋' }} Batteriestand </div>
+              </div>
             </div>
           </div>
         </div>
-        <div v-if="selectedDetails === 'Batteriestand'">
-          <div class="graph"> <svg v-if="processedData.length > 0" class="graph-svg"
-              :viewBox="`0 0 ${graphWidth} ${graphHeight}`" preserveAspectRatio="xMidYMid meet" width="100%"
-              height="auto">
-              <g v-for="(level, index) in yAxisLabels" :key="'y-' + index">
-                <line x1="40" :y1="level.y" :x2="graphWidth - 10" :y2="level.y" stroke="rgb(40, 40, 40)"
-                  stroke-width="1" /> <text :x="30" :y="level.y + 4" text-anchor="end" font-size="12" fill="#fff"> {{
-                  level.label }} </text>
-              </g>
-              <g v-for="(time, index) in xAxisLabels" :key="'x-' + index">
-                <line :x1="time.x" y1="10" :x2="time.x" :y2="graphHeight - 30" stroke="rgb(40, 40, 40)"
-                  stroke-width="1" /> <text :x="time.x" :y="graphHeight - 15" text-anchor="middle" font-size="14"
-                  fill="#fff"> {{ time.label }} </text>
-              </g>
-              <polyline :points="generatePolylinePoints()" fill="none" stroke="#67ea94" stroke-width="2" />
-              <circle v-for="(point, index) in processedData" :key="'point-' + index" :cx="point.x" :cy="point.y" r="4"
-                fill="#67ea94" />
-            </svg> </div>
+        <div class="details" v-if="selectedDetails">
+          <p class="details__headline">{{ selectedDetails }}</p>
+          <div class="close" @click.stop="close"></div>
+          <div v-if="selectedTraceRoute && selectedDetails === 'Traceroutes'">
+            <div v-for="(tr, index) in selectedTraceRoute" :key="index" class="traceroutes">
+              <p class="traceroutes__time">{{ getTraceTimestamp(tr.timeStamp) }} - Tracroute mit {{ tr.hops }} {{
+                tr.hops
+                === 1 ? 'Hop' : 'Hops' }} {{ tr.hops === 0 ? '(direkt)' : '' }}</p>
+              <div class="traceroutes__row">
+                <p class="traceroutes__row--key">Route Hinweg:</p>
+                <p class="traceroutes__row--value">{{ formatRoute(tr.nodeTraceTo) }}</p>
+              </div>
+              <div class="traceroutes__row">
+                <p class="traceroutes__row--key">Route Rückweg:</p>
+                <p class="traceroutes__row--value">{{ formatRoute(tr.nodeTraceFrom) }}</p>
+              </div>
+            </div>
+          </div>
+          <div v-if="selectedDetails === 'Batteriestand'">
+            <div class="graph"> <svg v-if="processedData.length > 0" class="graph-svg"
+                :viewBox="`0 0 ${graphWidth} ${graphHeight}`" preserveAspectRatio="xMidYMid meet" width="100%"
+                height="auto">
+                <g v-for="(level, index) in yAxisLabels" :key="'y-' + index">
+                  <line x1="40" :y1="level.y" :x2="graphWidth - 10" :y2="level.y" stroke="rgb(40, 40, 40)"
+                    stroke-width="1" /> <text :x="30" :y="level.y + 4" text-anchor="end" font-size="12" fill="#fff"> {{
+                    level.label }} </text>
+                </g>
+                <g v-for="(time, index) in xAxisLabels" :key="'x-' + index">
+                  <line :x1="time.x" y1="10" :x2="time.x" :y2="graphHeight - 30" stroke="rgb(40, 40, 40)"
+                    stroke-width="1" /> <text :x="time.x" :y="graphHeight - 15" text-anchor="middle" font-size="14"
+                    fill="#fff"> {{ time.label }} </text>
+                </g>
+                <polyline :points="generatePolylinePoints()" fill="none" stroke="#67ea94" stroke-width="2" />
+                <circle v-for="(point, index) in processedData" :key="'point-' + index" :cx="point.x" :cy="point.y"
+                  r="4" fill="#67ea94" />
+              </svg> </div>
+          </div>
         </div>
       </div>
-    </div>
 </template>
 
 <script setup>
 import { useMeshDataStore } from '@/stores/meshDataStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 
-let intervalId;
 const meshDataStore = useMeshDataStore();
+const settingsStore = useSettingsStore();
+
+let intervalId;
+
 const elapsedSeconds = ref(0);
 const traceRoutesVisible = ref(false);
 const selectedTraceRoute = ref([]);
@@ -132,6 +163,8 @@ const selectedDetails = ref(null);
 const nodeOptionsVisible = ref(false);
 const enableMasters = ref(false);
 const nodeImages = ref(['HELTEC_V3', 'TBEAM', 'T_ECHO', 'T_DECK', 'TRACKER_T1000_E']);
+const originalViewMode = ref(null);
+
 const graphWidth = 600;
 const graphHeight = 300;
 const padding = { top: 10, bottom: 30, left: 40, right: 18 };
@@ -158,7 +191,7 @@ const processedData = computed(() => {
       (graphHeight - padding.top - padding.bottom);
     return { x, y };
   });
-});
+})
 
 const yAxisLabels = computed(() => {
   const levels = [25, 50, 75, 100];
@@ -169,7 +202,7 @@ const yAxisLabels = computed(() => {
       padding.bottom -
       (level / 100) * (graphHeight - padding.top - padding.bottom),
   }));
-});
+})
 
 const xAxisLabels = computed(() => {
   const data = getBatteryLevelHistory(selectedNode.value);
@@ -192,20 +225,20 @@ const xAxisLabels = computed(() => {
     });
   }
   return labels;
-});
+})
 
 const generatePolylinePoints = () => {
   return processedData.value
     .map((point) => `${point.x},${point.y}`)
     .join(" ");
-};
+}
 
 const formatTimeOnly = (timestamp) => {
   const date = new Date(timestamp);
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${hours}:${minutes}`;
-};
+}
 
 const selectMasterNode = (nodeId) => {
   selectedMasterNode.value = nodeId;
@@ -213,7 +246,7 @@ const selectMasterNode = (nodeId) => {
 }
 
 const copy = (copyValue) => {
-  navigator.clipboard.writeText(copyValue)
+  navigator.clipboard.writeText(copyValue);
 }
 
 const selectNode = (nodeId) => {
@@ -225,12 +258,17 @@ const selectNode = (nodeId) => {
     selectedNode.value = nodeId;
     nodeOptionsVisible.value = true;
   }
-};
+}
 
 const selectDetails = (type) => {
   selectedDetails.value = type;
   nodeOptionsVisible.value = false;
-
+  if (originalViewMode.value === null) {
+    originalViewMode.value = settingsStore.viewMode;
+  }
+  if (settingsStore.viewMode === 'compact') {
+    settingsStore.setViewMode('normal');
+  }
   if (type === 'Traceroutes') {
     meshDataStore.data[selectedMasterNode.value].traceroutes.forEach((tr) => {
       if (tr.nodeId === selectedNode.value) {
@@ -246,6 +284,10 @@ const close = () => {
   selectedNode.value = null;
   nodeOptionsVisible.value = false;
   selectedDetails.value = false;
+  if (originalViewMode.value !== null) {
+    settingsStore.setViewMode(originalViewMode.value);
+    originalViewMode.value = null;
+  }
 }
 
 const getBatteryLevelHistory = (nodeId) => {
@@ -253,7 +295,7 @@ const getBatteryLevelHistory = (nodeId) => {
     (node) => node.id === nodeId
   );
   return node?.power?.batteryLevel || [];
-};
+}
 
 const formatRoute = (nodeIds) => {
   return nodeIds
@@ -268,7 +310,7 @@ const getNodeStatus = (node) => {
   const colorStatesHours = {
     green: 1.5,
     orange: 6
-  }
+  };
   const oneHour = 60 * 60 * 1000;
   const recent = colorStatesHours.green * oneHour;
   const long = colorStatesHours.orange * oneHour;
@@ -283,7 +325,7 @@ const getNodeStatus = (node) => {
   } else {
     return 'node__online--long';
   }
-};
+}
 
 const getLastTraceTimestampMillis = (nodeId) => {
   const traceroute = meshDataStore.data[selectedMasterNode.value].traceroutes.find(tr => tr.nodeId === nodeId);
@@ -291,7 +333,7 @@ const getLastTraceTimestampMillis = (nodeId) => {
     return traceroute.traces[traceroute.traces.length - 1].timeStamp;
   }
   return null;
-};
+}
 
 const formatTimestamp = (timestamp) => {
   const date = new Date(timestamp * 1000);
@@ -328,15 +370,16 @@ const startTimer = () => {
   intervalId = setInterval(() => {
     elapsedSeconds.value++;
   }, 1000);
-};
+}
 
 onMounted(() => {
   startTimer();
   enableMasters.value = true;
-});
+})
 
-watch(() => meshDataStore.data[selectedMasterNode.value], startTimer);
-onUnmounted(() => clearInterval(intervalId));
+watch(() => meshDataStore.data[selectedMasterNode.value], startTimer)
+
+onUnmounted(() => clearInterval(intervalId))
 </script>
 
 <style lang="scss">
@@ -366,6 +409,11 @@ onUnmounted(() => clearInterval(intervalId));
     display: grid;
     gap: 12px;
     grid-template-columns: repeat(1, 1fr);
+
+    &--compact {
+      padding: 12px;
+      grid-template-columns: repeat(1, 1fr) !important;
+    }
 
     @media (min-width: 968px) {
       grid-template-columns: repeat(2, 1fr);
@@ -426,6 +474,11 @@ onUnmounted(() => clearInterval(intervalId));
   position: relative;
   overflow: hidden;
 
+  &__compact {
+    padding: 24px 12px;
+    cursor: pointer;
+  }
+
   &__online {
     position: absolute;
     top: 12px;
@@ -433,6 +486,12 @@ onUnmounted(() => clearInterval(intervalId));
     height: 12px;
     width: 12px;
     border-radius: 100px;
+
+    &--compact {
+      top: 20px;
+      height: 18px;
+      width: 18px;
+    }
 
     &--short {
       background-color: rgb(12, 123, 12);
@@ -480,6 +539,11 @@ onUnmounted(() => clearInterval(intervalId));
       width: 100%;
       justify-content: space-between;
       gap: 12px;
+
+      &__compact {
+        margin-left: 32px;
+        line-height: 12px;
+      }
     }
   }
 
@@ -496,6 +560,12 @@ onUnmounted(() => clearInterval(intervalId));
     backdrop-filter: blur(4px);
       -webkit-backdrop-filter: blur(4px);
     
+    &--compact {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+    }
+
     &--headline {
       padding: 24px;
       font-weight: bold;
@@ -509,6 +579,10 @@ onUnmounted(() => clearInterval(intervalId));
       flex-direction: column;
       gap: 12px;
       padding: 12px 24px;
+
+      &__compact {
+        flex-direction: row;
+      }
 
       &__item {
         background-color: rgb(25, 25, 25);
@@ -610,5 +684,4 @@ onUnmounted(() => clearInterval(intervalId));
 .graph {
   max-width: 820px;
 }
-
 </style>
