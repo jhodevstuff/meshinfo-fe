@@ -90,14 +90,14 @@
           <div class="node__actions node__actions--compact"
             v-if="selectedNode === node.id && nodeOptionsVisible && (node.power.batteryLevel.length > 1 || getLastTraceTimestamp(node.id))">
             <div class="close close__moremargin" @click.stop="close"></div>
-            <p class="node__actions--headline">Verfügbare Details</p>
+            <p class="node__actions--headline node__actions--headline__compact">Verfügbare Details</p>
             <div class="node__actions--options node__actions--options__compact">
-              <div class="node__actions--options__item" v-if="getLastTraceTimestamp(node.id)"
-                @click.stop="selectDetails('Traceroutes')">
+              <div class="node__actions--options__item node__actions--options__item--compact"
+                v-if="getLastTraceTimestamp(node.id)" @click.stop="selectDetails('Traceroutes')">
                 🔭 Traceroutes
               </div>
-              <div class="node__actions--options__item" v-if="node.power.batteryLevel.length > 1"
-                @click.stop="selectDetails('Batteriestand')">
+              <div class="node__actions--options__item node__actions--options__item--compact"
+                v-if="node.power.batteryLevel.length > 1" @click.stop="selectDetails('Batteriestand')">
                 {{ (node.batteryLevel < 35) ? '🪫' : '🔋' }} Batteriestand </div>
               </div>
             </div>
@@ -563,7 +563,6 @@ onUnmounted(() => clearInterval(intervalId))
     &--compact {
       display: flex;
       flex-direction: row;
-      justify-content: center;
     }
 
     &--headline {
@@ -572,6 +571,15 @@ onUnmounted(() => clearInterval(intervalId))
       font-size: 18px;
       text-align: center;
       user-select: none;
+
+      &__compact {
+        line-height: 100%;
+        font-size: 16px;
+        padding: 24px 12px;
+        display: flex;
+        white-space: nowrap;
+        flex-wrap: nowrap;
+      }
     }
 
     &--options {
@@ -582,6 +590,8 @@ onUnmounted(() => clearInterval(intervalId))
 
       &__compact {
         flex-direction: row;
+        padding: 6px;
+        margin-right: 56px;
       }
 
       &__item {
@@ -591,6 +601,13 @@ onUnmounted(() => clearInterval(intervalId))
         user-select: none;
         cursor: pointer;
         text-align: center;
+
+        &--compact {
+          padding: 6px 12px;
+          display: flex;
+          vertical-align: middle;
+          align-items: center;
+        }
       }
     }
   }
