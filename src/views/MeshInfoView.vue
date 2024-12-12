@@ -306,27 +306,6 @@ const formatRoute = (nodeIds) => {
     .join(" → ");
 }
 
-const getNodeStatus = (node) => {
-  const colorStatesHours = {
-    green: 1.5,
-    orange: 6
-  };
-  const oneHour = 60 * 60 * 1000;
-  const recent = colorStatesHours.green * oneHour;
-  const long = colorStatesHours.orange * oneHour;
-  const currentTime = Date.now();
-  const lastHeardTime = node.lastHeard ? node.lastHeard * 1000 : null;
-  const lastTraceTime = getLastTraceTimestampMillis(node.id);
-  const latestTime = Math.max(lastHeardTime || 0, lastTraceTime || 0);
-  if (latestTime > currentTime - recent) {
-    return 'node__online--short';
-  } else if (latestTime > currentTime - long) {
-    return 'node__online--recent';
-  } else {
-    return 'node__online--long';
-  }
-}
-
 const getLastTraceTimestampMillis = (nodeId) => {
   const traceroute = meshDataStore.data[selectedMasterNode.value].traceroutes.find(tr => tr.nodeId === nodeId);
   if (traceroute && traceroute.traces.length > 0) {
@@ -336,13 +315,34 @@ const getLastTraceTimestampMillis = (nodeId) => {
 }
 
 const formatTimestamp = (timestamp) => {
-  const date = new Date(timestamp * 1000);
+  const date = new Date(timestamp);
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const year = String(date.getFullYear()).slice(-2);
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${day}.${month}.${year} - ${hours}:${minutes}`;
+}
+
+const getNodeStatus = (node) => {
+  const colorStatesHours = {
+    green: 1.5,
+    orange: 6
+  };
+  const oneHour = 60 * 60 * 1000;
+  const recent = colorStatesHours.green * oneHour;
+  const long = colorStatesHours.orange * oneHour;
+  const currentTime = Date.now();
+  const lastHeardTime = node.lastHeard ? node.lastHeard : null;
+  const lastTraceTime = getLastTraceTimestampMillis(node.id);
+  const latestTime = Math.max(lastHeardTime || 0, lastTraceTime || 0);
+  if (latestTime > currentTime - recent) {
+    return 'node__online--short';
+  } else if (latestTime > currentTime - long) {
+    return 'node__online--recent';
+  } else {
+    return 'node__online--long';
+  }
 }
 
 const getLastTraceTimestamp = (nodeId) => {
