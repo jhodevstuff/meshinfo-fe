@@ -72,6 +72,9 @@
               <div class="node__actions--options__item" v-if="node.power.batteryLevel.length > 1"
                 @click.stop="selectDetails('Batteriestand')">{{ (node.batteryLevel < 35) ? '🪫' : '🔋' }}
                   Batteriestand</div>
+                  <div class="node__actions--options__item" v-if="node.online.length > 1"
+                @click.stop="selectDetails('Online')">
+                ⏳ Online</div>
               </div>
             </div>
           </div>
@@ -140,6 +143,48 @@
                   r="4" fill="#67ea94" />
               </svg> </div>
           </div>
+          <div v-if="selectedDetails === 'Online'">
+            <div class="online-state">
+              <div class="online-state__left">
+                <div class="days">
+                  <p class="days__item" v-for="day in getOnlineHistory(selectedNode).days"> {{ day }}</p>
+                </div>
+              </div>
+              <div class="online-state__right">
+                <div class="hours">
+                  <p class="hours__item">0</p>
+                  <p class="hours__item">1</p>
+                  <p class="hours__item">2</p>
+                  <p class="hours__item">3</p>
+                  <p class="hours__item">4</p>
+                  <p class="hours__item">5</p>
+                  <p class="hours__item">6</p>
+                  <p class="hours__item">7</p>
+                  <p class="hours__item">8</p>
+                  <p class="hours__item">9</p>
+                  <p class="hours__item">10</p>
+                  <p class="hours__item">11</p>
+                  <p class="hours__item">12</p>
+                  <p class="hours__item">13</p>
+                  <p class="hours__item">14</p>
+                  <p class="hours__item">15</p>
+                  <p class="hours__item">16</p>
+                  <p class="hours__item">17</p>
+                  <p class="hours__item">18</p>
+                  <p class="hours__item">19</p>
+                  <p class="hours__item">20</p>
+                  <p class="hours__item">21</p>
+                  <p class="hours__item">22</p>
+                  <p class="hours__item">23</p>
+                </div>
+                <div class="fields">
+                  <div class="fields__row" v-for="day in getOnlineHistory(selectedNode).times">
+                    <div class="fields__row--item" v-for="h in day" :class="[h && 'state-online']"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 </template>
@@ -151,6 +196,7 @@ import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 
 const meshDataStore = useMeshDataStore();
 const settingsStore = useSettingsStore();
+const onlineHistoryCache = new Map();
 
 let intervalId;
 
@@ -297,6 +343,39 @@ const getBatteryLevelHistory = (nodeId) => {
   return node?.power?.batteryLevel || [];
 }
 
+const getOnlineHistory = (nodeId) => {
+  const cacheKey = selectedMasterNode.value + '#' + nodeId;
+  if (onlineHistoryCache.has(cacheKey)) return onlineHistoryCache.get(cacheKey);
+  if (onlineHistoryCache.has(nodeId)) return onlineHistoryCache.get(nodeId);
+
+  const node = meshDataStore.data[selectedMasterNode.value].knownNodes.find(
+    (node) => node.id === nodeId
+  );
+  if (!node) return { days: [], times: [] };
+
+  if (!node._onlineFormatted) {
+    node._onlineFormatted = node.online.map(ts => formatOnlineTimestamp(ts));
+  }
+
+  let onlineGraphNew = { days: [], times: [] };
+
+  let daysMap = new Map();
+  node._onlineFormatted.forEach((ts) => {
+    const key = ts.day + '.' + ts.month + '.';
+    if (!daysMap.has(key)) {
+      daysMap.set(key, new Array(24).fill(false));
+      onlineGraphNew.days.push(key);
+    }
+    const arr = daysMap.get(key);
+    arr[parseInt(ts.hours, 10)] = true;
+    daysMap.set(key, arr);
+  });
+
+  onlineGraphNew.times = [...daysMap.values()];
+  onlineHistoryCache.set(cacheKey, onlineGraphNew);
+  return onlineGraphNew;
+}
+
 const formatRoute = (nodeIds) => {
   return nodeIds
     .map(id => {
@@ -322,6 +401,24 @@ const formatTimestamp = (timestamp) => {
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${day}.${month}.${year} - ${hours}:${minutes}`;
+}
+
+const formatOnlineTimestamp = (timestamp) => {
+  const date = new Date(timestamp);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear()).slice(-2);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+
+  const returnValue = {
+    day: day,
+    month: month,
+    year: year,
+    hours: hours,
+    minutes: minutes
+  }
+  return returnValue;
 }
 
 const getNodeStatus = (node) => {
@@ -566,7 +663,7 @@ onUnmounted(() => clearInterval(intervalId))
     }
 
     &--headline {
-      padding: 24px;
+      padding: 16px 0;
       font-weight: bold;
       font-size: 18px;
       text-align: center;
@@ -585,7 +682,7 @@ onUnmounted(() => clearInterval(intervalId))
     &--options {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 6px;
       padding: 12px 24px;
 
       &__compact {
@@ -701,4 +798,75 @@ onUnmounted(() => clearInterval(intervalId))
 .graph {
   max-width: 820px;
 }
+
+.online-state {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+
+  &__right {
+    width: 100%;
+    flex-shrink: 2;
+  }
+
+  .days {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    justify-content: flex-end;
+
+    &__item {
+      height: 16px;
+      font-size: 14px;
+      border-bottom: 1px solid rgb(40, 40, 40);
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      padding-top: 2px;
+    }
+  }
+
+  .hours {
+    display: flex;
+    justify-content: space-between;
+    flex-direction: row;
+    gap: 1px;
+    margin-bottom: 12px;
+
+    &__item {
+      width: 16px;
+      height: 16px;
+      font-size: 14px;
+      text-align: center;
+    }
+  }
+
+  .fields {
+    display: flex;
+    flex-direction: column;
+
+    &__row {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      gap: 1px;
+      border-bottom: 1px solid rgb(40, 40, 40);
+      margin-bottom: 6px;
+      padding-bottom: 6px;
+
+      &--item {
+        background-color:  rgb(173, 66, 0);
+        width: 16px;
+        height: 16px;
+        font-size: 14px;
+        text-align: center;
+        border-radius: 2px;
+      }
+    }
+  }
+}
+
+.state-online {
+  background-color: rgb(12, 123, 12) !important;
+}
+
 </style>
