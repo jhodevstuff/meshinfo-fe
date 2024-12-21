@@ -10,16 +10,17 @@
       </div>
       <div class="master-nodes" v-if="enableMasters">
         <div class="master-nodes__container">
-          <div class="master-nodes__option"
+          <div class="master-nodes__option" v-for="masterNode in filteredMasters" :key="masterNode"
             :class="(selectedMasterNode == masterNode && meshDataStore.nodesIndex.length > 1) && 'master-nodes__selected'"
-            v-for="masterNode in meshDataStore.nodesIndex" :key="masterNode" @click="selectMasterNode(masterNode)">
-            <p class="master-nodes__option--label"> {{ masterNode }} ({{
-              meshDataStore.data[masterNode]?.knownNodes?.[0]?.shortName || '----' }}) </p>
+            @click="selectMasterNode(masterNode)">
+            <p class="master-nodes__option--label">
+              {{ masterNode }} ({{ meshDataStore.data[masterNode]?.knownNodes?.[0]?.shortName || '----' }})
+            </p>
           </div>
         </div>
       </div>
       <div class="nodes__list" v-show="settingsStore.viewMode === 'normal'">
-        <div class="node" v-for="node in meshDataStore.data[selectedMasterNode].knownNodes" :key="node.id"
+        <div class="node" v-for="node in sortedNodes" :key="node.id"
           v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)">
           <div v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
             :class="['node__online', getNodeStatus(node)]"></div>
@@ -81,7 +82,7 @@
         </div>
       </div>
       <div class="nodes__list nodes__list--compact" v-show="settingsStore.viewMode === 'compact'">
-        <div class="node node__compact" v-for="node in meshDataStore.data[selectedMasterNode].knownNodes" :key="node.id"
+        <div class="node node__compact" v-for="node in sortedNodes" :key="node.id"
           v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)"
           @click.stop="selectDetails('Wähle eine verfügbare Info')">
           <div v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
@@ -109,7 +110,7 @@
           </div>
           <p class="details__headline">{{ selectedDetails }}</p>
           <div class="close" @click.stop="close"></div>
-          <div v-if="selectedTraceRoute && selectedDetails === 'Traceroutes'">
+          <div class="traceroutes-container" v-if="selectedTraceRoute && selectedDetails === 'Traceroutes'">
             <div v-for="(tr, index) in selectedTraceRoute" :key="index" class="traceroutes">
               <p class="traceroutes__time">{{ getTraceTimestamp(tr.timeStamp) }} - Tracroute mit {{ tr.hops }} {{
                 tr.hops
@@ -219,6 +220,9 @@ const enableMasters = ref(false);
 const nodeImages = ref(['HELTEC_V3', 'TBEAM', 'T_ECHO', 'T_DECK', 'TRACKER_T1000_E', 'RAK4631', 'HELTEC_MESH_NODE_T114']);
 const originalViewMode = ref(null);
 
+const cutOffMasterNodeDays = 1;
+const cutoffMasterNode = Date.now() - cutOffMasterNodeDays * 24 * 60 * 60 * 1000;
+
 const modelShortNames = {
   TRACKER_T1000_E: 'T1000E',
   HELTEC_V3: 'Heltec V3',
@@ -231,6 +235,14 @@ const modelShortNames = {
   RPI_PICO: 'RPi Pico',
   UNSET: '?'
 }
+
+const sortedNodes = computed(() => {
+  const nodes = meshDataStore.data[selectedMasterNode.value]?.knownNodes || [];
+  if (settingsStore.sortMode === 'lastHeard') {
+    return [...nodes].sort((a, b) => (b.lastHeard || 0) - (a.lastHeard || 0));
+  }
+  return nodes;
+});
 
 const graphWidth = 600;
 const graphHeight = 300;
@@ -314,6 +326,14 @@ const formatTimeOnly = (timestamp) => {
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${hours}:${minutes}`;
 }
+
+const filteredMasters = computed(() => {
+  return meshDataStore.nodesIndex.filter(masterNodeId => {
+    const masterNode = meshDataStore.data[masterNodeId]?.knownNodes?.[0];
+    if (!masterNode || !masterNode.lastHeard) return false;
+    return masterNode.lastHeard >= cutoffMasterNode;
+  });
+})
 
 const selectMasterNode = (nodeId) => {
   selectedMasterNode.value = nodeId;
@@ -829,6 +849,11 @@ onUnmounted(() => clearInterval(intervalId))
     top: 24px;
     right: 24px;
   }
+}
+
+.traceroutes-container {
+  display: flex;
+  flex-direction: column-reverse;
 }
 
 .traceroutes {

@@ -25,6 +25,17 @@
           Kompakt
         </label>
       </div>
+      <div class="settings-panel__option">
+        <h1 class="settings-panel__option--title">Sortierung</h1>
+        <label class="settings-panel__option--label">
+          <input type="radio" value="lastHeard" v-model="sortMode" @change="updateSortMode" />
+          Zuletzt online
+        </label>
+        <label class="settings-panel__option--label">
+          <input type="radio" value="original" v-model="sortMode" @change="updateSortMode" />
+          Zuerst gesehen
+        </label>
+      </div>
     </div>
   </div>
 </template>
@@ -36,6 +47,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 const settingsVisible = ref(false)
 const settingsStore = useSettingsStore()
 const viewMode = ref(settingsStore.viewMode)
+const sortMode = ref(settingsStore.sortMode)
 
 const toggleSettings = () => {
   settingsVisible.value = !settingsVisible.value
@@ -43,6 +55,11 @@ const toggleSettings = () => {
 
 const updateViewMode = () => {
   settingsStore.setViewMode(viewMode.value)
+  settingsVisible.value = false
+}
+
+const updateSortMode = () => {
+  settingsStore.setSortMode(sortMode.value)
   settingsVisible.value = false
 }
 
@@ -156,6 +173,9 @@ const openMap = () => {
   padding-bottom: 20px;
   color: #000;
   transition: all 300ms ease-in-out;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
 
   &__option {
     display: flex;

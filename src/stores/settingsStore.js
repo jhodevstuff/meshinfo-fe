@@ -1,19 +1,24 @@
-import { defineStore } from 'pinia';
+import { defineStore } from "pinia";
 
-export const useSettingsStore = defineStore('settings', {
+export const useSettingsStore = defineStore("settings", {
   state: () => ({
-    viewMode: localStorage.getItem('meshinfo-config__view') || 'normal',
+    viewMode: localStorage.getItem("meshinfo-config__view") || "normal",
+    sortMode: localStorage.getItem("meshinfo-config__sort") || "lastHeard",
   }),
   actions: {
     setViewMode(mode) {
       this.viewMode = mode;
-      localStorage.setItem('meshinfo-config__view', mode);
+      localStorage.setItem("meshinfo-config__view", mode);
     },
     loadViewMode() {
-      const storedMode = localStorage.getItem('meshinfo-config__view');
+      const storedMode = localStorage.getItem("meshinfo-config__view");
       if (storedMode) {
         this.viewMode = storedMode;
       }
     },
+    setSortMode(mode) {
+      this.sortMode = mode;
+      localStorage.setItem("meshinfo-config__sort", mode);
+    },
   },
-})
+});
