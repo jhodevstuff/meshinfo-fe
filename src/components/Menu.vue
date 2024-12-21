@@ -9,11 +9,11 @@
         </div>
       </div>
       <div class="header__right">
+        <div class="map" @click="openMap"></div>
         <div class="settings" @click="toggleSettings"></div>
       </div>
     </div>
     <div class="settings-panel" v-show="settingsVisible">
-
       <div class="settings-panel__option">
         <h1 class="settings-panel__option--title">Ansicht</h1>
         <label class="settings-panel__option--label">
@@ -30,21 +30,30 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { useSettingsStore } from '@/stores/settingsStore';
+import { ref } from 'vue'
+import { useSettingsStore } from '@/stores/settingsStore'
 
-const settingsVisible = ref(false);
-const settingsStore = useSettingsStore();
-const viewMode = ref(settingsStore.viewMode);
+const settingsVisible = ref(false)
+const settingsStore = useSettingsStore()
+const viewMode = ref(settingsStore.viewMode)
 
 const toggleSettings = () => {
-  settingsVisible.value = !settingsVisible.value;
-};
+  settingsVisible.value = !settingsVisible.value
+}
 
 const updateViewMode = () => {
-  settingsStore.setViewMode(viewMode.value);
-  settingsVisible.value = false;
-};
+  settingsStore.setViewMode(viewMode.value)
+  settingsVisible.value = false
+}
+
+const openMap = () => {
+  fetch('maplink.json')
+    .then(res => res.json())
+    .then(data => {
+      window.open(data.maplink, '_blank')
+    })
+    .catch(err => console.error(err))
+}
 </script>
 
 <style lang="scss" scoped>
@@ -72,6 +81,11 @@ const updateViewMode = () => {
 }
 
 .header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 6;
   background-color: #67ea94;
   -webkit-box-shadow: 0px 5px 10px 2px rgba(103, 234, 148, 0.4);
   box-shadow: 0px 5px 10px 2px rgba(103, 234, 148, 0.4);
@@ -110,17 +124,28 @@ const updateViewMode = () => {
   &__left, &__right {
     display: flex;
   }
+
+  &__right {
+    gap: 12px
+  }
 }
 
-.settings {
+.settings, .map {
   margin-top: 2px;
   width: 30px;
   height: 100%;
-  background-image: url('../assets/icons/gear.svg');
   background-repeat: no-repeat;
   background-size: 100%;
   background-position: center center;
   cursor: pointer;
+}
+
+.settings {
+  background-image: url('../assets/icons/gear.svg');
+}
+
+.map {
+  background-image: url('../assets/icons/map.svg');
 }
 
 .settings-panel {

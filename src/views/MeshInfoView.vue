@@ -5,7 +5,7 @@
         <p class="nodes__info--total">Nodes gesamt: {{ meshDataStore.data[selectedMasterNode].knownNodes.length }}</p>
         <div class="nodes__info--update">
           <p>{{ elapsedSeconds }}</p>
-          <p>Sekunden seit Update {{ elapsedSeconds > 3600 ? '🧐' : null }}</p>
+          <p>Sekunden seit Update {{ elapsedSeconds > 3600 ? '👀' : null }}</p>
         </div>
       </div>
       <div class="master-nodes" v-if="enableMasters">
@@ -28,7 +28,7 @@
               :style="'background-image: url(src/assets/devices/' + node.model + '.png)'"></div>
             <div v-if="!nodeImages.includes(node.model)" class="node__icon--img"
               :style="'background-image: url(src/assets/devices/unknown.svg); background-size: 50%;'"></div>
-            <p>{{ node.model === 'TRACKER_T1000_E' ? 'T1000E' : node.model }}</p>
+            <p>{{ modelShortNames[node.model] || node.model }}</p>
           </div>
           <div class="node__info">
             <div class="node__info--block">
@@ -63,18 +63,18 @@
                 kopieren </a> </p>
           </div>
           <div class="node__actions"
-            v-if="selectedNode === node.id && nodeOptionsVisible && (node.power.batteryLevel.length > 1 || getLastTraceTimestamp(node.id))">
+            v-if="selectedNode === node.id && nodeOptionsVisible && (node.power.batteryLevel.length > 1 || getLastTraceTimestamp(node.id) || node.online.length > 1) && selectedDetails == ''">
             <div class="close close__moremargin" @click.stop="close"></div>
             <p class="node__actions--headline">Verfügbare Details</p>
             <div class="node__actions--options">
-              <div class="node__actions--options__item" v-if="getLastTraceTimestamp(node.id)"
-                @click.stop="selectDetails('Traceroutes')">🔭 Traceroutes</div>
+              <div class="node__actions--options__item" v-if="node.online.length > 1"
+                @click.stop="selectDetails('Online')">
+                ⏳ Online</div>
               <div class="node__actions--options__item" v-if="node.power.batteryLevel.length > 1"
                 @click.stop="selectDetails('Batteriestand')">{{ (node.batteryLevel < 35) ? '🪫' : '🔋' }}
                   Batteriestand</div>
-                  <div class="node__actions--options__item" v-if="node.online.length > 1"
-                @click.stop="selectDetails('Online')">
-                ⏳ Online</div>
+                  <div class="node__actions--options__item" v-if="getLastTraceTimestamp(node.id)"
+                    @click.stop="selectDetails('Traceroutes')">🔭 Traceroutes</div>
               </div>
             </div>
           </div>
@@ -82,7 +82,8 @@
       </div>
       <div class="nodes__list nodes__list--compact" v-show="settingsStore.viewMode === 'compact'">
         <div class="node node__compact" v-for="node in meshDataStore.data[selectedMasterNode].knownNodes" :key="node.id"
-          v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)">
+          v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)"
+          @click.stop="selectDetails('Wähle eine verfügbare Info')">
           <div v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
             :class="['node__online node__online--compact', getNodeStatus(node)]">
           </div>
@@ -90,23 +91,22 @@
             <p>{{ node.longName }}</p>
             <p class="bold">{{ node.shortName }}</p>
           </div>
-          <div class="node__actions node__actions--compact"
-            v-if="selectedNode === node.id && nodeOptionsVisible && (node.power.batteryLevel.length > 1 || getLastTraceTimestamp(node.id))">
-            <div class="close close__moremargin" @click.stop="close"></div>
-            <p class="node__actions--headline node__actions--headline__compact">Verfügbare Details</p>
-            <div class="node__actions--options node__actions--options__compact">
-              <div class="node__actions--options__item node__actions--options__item--compact"
-                v-if="getLastTraceTimestamp(node.id)" @click.stop="selectDetails('Traceroutes')">
-                🔭 Traceroutes
-              </div>
-              <div class="node__actions--options__item node__actions--options__item--compact"
-                v-if="node.power.batteryLevel.length > 1" @click.stop="selectDetails('Batteriestand')">
-                {{ (node.batteryLevel < 35) ? '🪫' : '🔋' }} Batteriestand </div>
-              </div>
-            </div>
-          </div>
         </div>
-        <div class="details" v-if="selectedDetails">
+      </div>
+      <div class="details" v-if="selectedDetails">
+        <div class="details__actions" v-for="node in meshDataStore.data[selectedMasterNode].knownNodes"
+          v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)">
+          <div class="details__actions--item"
+            :class="selectedDetails === 'Online' && 'details__actions--item__selected'" v-if="node.online.length > 1"
+            @click.stop="selectDetails('Online')">⏳ Online</div>
+          <div class="details__actions--item"
+            :class="selectedDetails === 'Batteriestand' && 'details__actions--item__selected'"
+            v-if="node.power.batteryLevel.length > 1" @click.stop="selectDetails('Batteriestand')">{{ (node.batteryLevel
+            < 35) ? '🪫' : '🔋' }} Batteriestand</div>
+              <div class="details__actions--item"
+                :class="selectedDetails === 'Traceroutes' && 'details__actions--item__selected'"
+                v-if="getLastTraceTimestamp(node.id)" @click.stop="selectDetails('Traceroutes')">🔭 Traceroutes</div>
+          </div>
           <p class="details__headline">{{ selectedDetails }}</p>
           <div class="close" @click.stop="close"></div>
           <div v-if="selectedTraceRoute && selectedDetails === 'Traceroutes'">
@@ -130,7 +130,8 @@
                 height="auto">
                 <g v-for="(level, index) in yAxisLabels" :key="'y-' + index">
                   <line x1="40" :y1="level.y" :x2="graphWidth - 10" :y2="level.y" stroke="rgb(40, 40, 40)"
-                    stroke-width="1" /> <text :x="30" :y="level.y + 4" text-anchor="end" font-size="12" fill="#fff"> {{
+                    stroke-width="1" /> <text :x="30" :y="level.y + 4" text-anchor="end" font-size="12" fill="#fff">
+                    {{
                     level.label }} </text>
                 </g>
                 <g v-for="(time, index) in xAxisLabels" :key="'x-' + index">
@@ -205,11 +206,24 @@ const traceRoutesVisible = ref(false);
 const selectedTraceRoute = ref([]);
 const selectedMasterNode = ref(useMeshDataStore().nodesIndex[0]);
 const selectedNode = ref(null);
-const selectedDetails = ref(null);
+const selectedDetails = ref('');
 const nodeOptionsVisible = ref(false);
 const enableMasters = ref(false);
-const nodeImages = ref(['HELTEC_V3', 'TBEAM', 'T_ECHO', 'T_DECK', 'TRACKER_T1000_E']);
+const nodeImages = ref(['HELTEC_V3', 'TBEAM', 'T_ECHO', 'T_DECK', 'TRACKER_T1000_E', 'RAK4631', 'HELTEC_MESH_NODE_T114']);
 const originalViewMode = ref(null);
+
+const modelShortNames = {
+  TRACKER_T1000_E: 'T1000E',
+  HELTEC_V3: 'Heltec V3',
+  TBEAM: 'T-Beam',
+  T_ECHO: 'T-Echo',
+  T_DECK: 'T-Deck',
+  RAK4631: 'RAK4631',
+  HELTEC_MESH_NODE_T114: 'Heltec T114',
+  HELTEC_WIRELESS_TRACKER: 'Heltec Wireless Tracker',
+  RPI_PICO: 'RPi Pico',
+  UNSET: '?'
+}
 
 const graphWidth = 600;
 const graphHeight = 300;
@@ -476,6 +490,18 @@ onMounted(() => {
 
 watch(() => meshDataStore.data[selectedMasterNode.value], startTimer)
 
+watch(
+  () => selectedMasterNode.value,
+  () => {
+    if (selectedDetails.value === 'Traceroutes') {
+      const tr = meshDataStore.data[selectedMasterNode.value]
+        .traceroutes.find(x => x.nodeId === selectedNode.value);
+      selectedTraceRoute.value = tr ? tr.traces : [];
+      traceRoutesVisible.value = !!tr;
+    }
+  }
+);
+
 onUnmounted(() => clearInterval(intervalId))
 </script>
 
@@ -485,6 +511,7 @@ onUnmounted(() => clearInterval(intervalId))
   flex-direction: column;
   gap: 16px;
   margin: 12px;
+  margin-top: 80px;
 
   &__info {
     margin: 12px 0;
@@ -528,16 +555,14 @@ onUnmounted(() => clearInterval(intervalId))
 
 .master-nodes {
   display: flex;
-  justify-content: center;
-  text-align: center;
-  flex-direction: column;
 
   &__container {
+    width: 100%;
     background-color: rgb(40, 40, 40);
-    padding: 6px 22px;
+    padding: 6px;
     display: flex;
-    justify-content: center;
-    gap: 22px;
+    flex-wrap: wrap;
+    gap: 6px;
     border-radius: 3px;
     overflow: hidden;
   }
@@ -549,9 +574,12 @@ onUnmounted(() => clearInterval(intervalId))
     border-bottom: 2px solid transparent;
     cursor: pointer;
     transition: all 300ms ease-in-out;
+    margin-left: 6px;
+    margin-right: 6px;
 
     &--label {
       font-weight: normal;
+      white-space: nowrap;
     }
   }
 
@@ -737,15 +765,36 @@ onUnmounted(() => clearInterval(intervalId))
 }
 
 .details {
-  margin: 12px;
-  padding: 12px 0;
+  margin: 0 12px;
   border-radius: 3px;
   position: relative;
 
   &__headline {
     font-weight: bold;
     font-size: 22px;
-    margin-bottom: 24px;
+    margin-bottom: 18px;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 32px 0;
+    margin-bottom: 28px;
+
+    &--item {
+      border: 1px solid rgb(40, 40, 40);
+      background-color: rgb(40, 40, 40);
+      padding: 10px 12px;
+      font-size: 16px;
+      border-radius: 3px;
+      cursor: pointer;
+      user-select: none;
+
+      &__selected {
+        border: 1px solid rgb(80, 80, 80);
+      }
+    }
   }
 }
 
@@ -753,8 +802,8 @@ onUnmounted(() => clearInterval(intervalId))
   width: 20px;
   height: 20px;
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 0;
+  right: 0;
   background-image: url('/src/assets/icons/x.svg');
   background-repeat: no-repeat;
   background-size: contain;
