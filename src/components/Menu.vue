@@ -47,13 +47,16 @@ const updateViewMode = () => {
 }
 
 const openMap = () => {
+  const newWindow = window.open('', '_blank');
+  if (!newWindow) return;
   fetch('maplink.json')
     .then(res => res.json())
     .then(data => {
-      window.open(data.maplink, '_blank')
+      newWindow.location.href = data.maplink;
     })
     .catch(err => console.error(err))
 }
+
 </script>
 
 <style lang="scss" scoped>
