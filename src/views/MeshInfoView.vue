@@ -125,24 +125,31 @@
             </div>
           </div>
           <div v-if="selectedDetails === 'Batteriestand'">
-            <div class="graph"> <svg v-if="processedData.length > 0" class="graph-svg"
-                :viewBox="`0 0 ${graphWidth} ${graphHeight}`" preserveAspectRatio="xMidYMid meet" width="100%"
-                height="auto">
+            <div class="graph">
+              <svg v-if="processedData.length > 0" :viewBox="`0 0 ${graphWidth} ${graphHeight}`"
+                preserveAspectRatio="xMidYMid meet" width="100%" height="auto">
                 <g v-for="(level, index) in yAxisLabels" :key="'y-' + index">
                   <line x1="40" :y1="level.y" :x2="graphWidth - 10" :y2="level.y" stroke="rgb(40, 40, 40)"
-                    stroke-width="1" /> <text :x="30" :y="level.y + 4" text-anchor="end" font-size="12" fill="#fff">
-                    {{
-                    level.label }} </text>
+                    stroke-width="1" />
+                  <text :x="30" :y="level.y + 4" text-anchor="end" font-size="12" fill="#fff">
+                    {{ level.label }}
+                  </text>
                 </g>
                 <g v-for="(time, index) in xAxisLabels" :key="'x-' + index">
                   <line :x1="time.x" y1="10" :x2="time.x" :y2="graphHeight - 30" stroke="rgb(40, 40, 40)"
-                    stroke-width="1" /> <text :x="time.x" :y="graphHeight - 15" text-anchor="middle" font-size="14"
-                    fill="#fff"> {{ time.label }} </text>
+                    stroke-width="1" />
+                  <text :x="time.x" :y="graphHeight - 28" text-anchor="middle" font-size="12" fill="#fff">
+                    {{ time.date }}
+                  </text>
+                  <text :x="time.x" :y="graphHeight - 15" text-anchor="middle" font-size="14" fill="#fff">
+                    {{ time.label }}
+                  </text>
                 </g>
                 <polyline :points="generatePolylinePoints()" fill="none" stroke="#67ea94" stroke-width="2" />
                 <circle v-for="(point, index) in processedData" :key="'point-' + index" :cx="point.x" :cy="point.y"
                   r="4" fill="#67ea94" />
-              </svg> </div>
+              </svg>
+            </div>
           </div>
           <div v-if="selectedDetails === 'Online'">
             <div class="online-state">
@@ -229,6 +236,13 @@ const graphWidth = 600;
 const graphHeight = 300;
 const padding = { top: 10, bottom: 30, left: 40, right: 18 };
 
+function formatDayMonth(timestamp) {
+  const d = new Date(timestamp);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${day}.${month}.`;
+}
+
 const processedData = computed(() => {
   const data = getBatteryLevelHistory(selectedNode.value);
   if (!data.length) return [];
@@ -276,6 +290,7 @@ const xAxisLabels = computed(() => {
   for (let i = 0; i <= 4; i++) {
     const timestamp = timeRange[0] + i * step;
     labels.push({
+      date: formatDayMonth(timestamp),
       label: formatTimeOnly(timestamp),
       x:
         padding.left +
