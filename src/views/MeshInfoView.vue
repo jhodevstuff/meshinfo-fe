@@ -238,11 +238,22 @@ const modelShortNames = {
 
 const sortedNodes = computed(() => {
   const nodes = meshDataStore.data[selectedMasterNode.value]?.knownNodes || [];
+  const masterNodeId = meshDataStore.data[selectedMasterNode.value]?.info?.infoFrom;
+  let arr;
   if (settingsStore.sortMode === 'lastHeard') {
-    return [...nodes].sort((a, b) => (b.lastHeard || 0) - (a.lastHeard || 0));
+    arr = [...nodes].sort((a, b) => (b.lastHeard || 0) - (a.lastHeard || 0));
+  } else {
+    arr = [...nodes];
   }
-  return nodes;
-});
+  if (masterNodeId) {
+    const index = arr.findIndex(n => n.id === masterNodeId);
+    if (index > 0) {
+      const [masterNode] = arr.splice(index, 1);
+      arr.unshift(masterNode);
+    }
+  }
+  return arr;
+})
 
 const graphWidth = 600;
 const graphHeight = 300;

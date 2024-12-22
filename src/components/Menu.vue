@@ -9,7 +9,7 @@
         </div>
       </div>
       <div class="header__right">
-        <div class="map" @click="openMap"></div>
+        <div class="map" :class="{ closemap: isMapRoute }" @click="isMapRoute ? closeMap() : goMap()"></div>
         <div class="settings" @click="toggleSettings"></div>
       </div>
     </div>
@@ -41,13 +41,27 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useSettingsStore } from '@/stores/settingsStore'
+
+const router = useRouter()
+const route = useRoute()
 
 const settingsVisible = ref(false)
 const settingsStore = useSettingsStore()
 const viewMode = ref(settingsStore.viewMode)
 const sortMode = ref(settingsStore.sortMode)
+
+const isMapRoute = computed(() => route.path === '/map')
+
+const goMap = () => {
+  router.push('/map')
+}
+
+const closeMap = () => {
+  router.push('/')
+}
 
 const toggleSettings = () => {
   settingsVisible.value = !settingsVisible.value
@@ -62,44 +76,9 @@ const updateSortMode = () => {
   settingsStore.setSortMode(sortMode.value)
   settingsVisible.value = false
 }
-
-const openMap = () => {
-  const newWindow = window.open('', '_blank');
-  if (!newWindow) return;
-  fetch('maplink.json')
-    .then(res => res.json())
-    .then(data => {
-      newWindow.location.href = data.maplink;
-    })
-    .catch(err => console.error(err))
-}
-
 </script>
 
-<style lang="scss" scoped>
-.menu {
-  padding: 36px 12px;
-  display: flex;
-  justify-content: center;
-  background-color: #67ea94;
-  transition: all 300ms ease-in-out;
-
-  &__item {
-    padding: 12px 16px;
-    font-weight: bold;
-    font-size: 18px;
-    text-decoration: none;
-    color: #000;
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-    transition: all 300ms ease-in-out;
-  }
-}
-
-.router-link-active {
-  border-bottom: 2px solid #000;
-}
-
+<style scoped lang="scss">
 .header {
   position: fixed;
   top: 0;
@@ -107,14 +86,30 @@ const openMap = () => {
   width: 100%;
   z-index: 6;
   background-color: #67ea94;
-  -webkit-box-shadow: 0px 5px 10px 2px rgba(103, 234, 148, 0.4);
   box-shadow: 0px 5px 10px 2px rgba(103, 234, 148, 0.4);
+  -webkit-box-shadow: 0px 5px 10px 2px rgba(103, 234, 148, 0.4);
 
   &-row {
-    padding: 6px 12px;
-    padding-bottom: 10px;
+    padding: 6px 12px 10px 12px;
     display: flex;
     justify-content: space-between;
+  }
+
+  &__left, &__right {
+    display: flex;
+  }
+
+  &__right {
+    gap: 12px;
+  }
+
+  &__logo {
+    width: 46px;
+    height: 100%;
+    background-image: url('../assets/meshtastic.svg');
+    background-repeat: no-repeat;
+    background-size: 100%;
+    background-position: center center;
   }
 
   &__info {
@@ -131,46 +126,36 @@ const openMap = () => {
       display: none;
     }
   }
-
-  &__logo {
-    width: 46px;
-    height: 100%;
-    background-image: url('../assets/meshtastic.svg');
-    background-repeat: no-repeat;
-    background-size: 100%;
-    background-position: center center;
-  }
-
-  &__left, &__right {
-    display: flex;
-  }
-
-  &__right {
-    gap: 12px
-  }
 }
 
-.settings, .map {
+.map {
   margin-top: 2px;
   width: 30px;
   height: 100%;
+  cursor: pointer;
+  background-repeat: no-repeat;
+  background-size: 100%;
+  background-position: center center;
+  background-image: url('../assets/icons/map.svg');
+
+  &.closemap {
+    background-image: url('../assets/icons/x-black.svg');
+  }
+}
+
+.settings {
+  margin-top: 2px;
+  width: 30px;
+  height: 100%;
+  background-image: url('../assets/icons/gear.svg');
   background-repeat: no-repeat;
   background-size: 100%;
   background-position: center center;
   cursor: pointer;
 }
 
-.settings {
-  background-image: url('../assets/icons/gear.svg');
-}
-
-.map {
-  background-image: url('../assets/icons/map.svg');
-}
-
 .settings-panel {
-  padding: 6px 12px;
-  padding-bottom: 20px;
+  padding: 6px 12px 20px 12px;
   color: #000;
   transition: all 300ms ease-in-out;
   display: flex;
@@ -192,7 +177,7 @@ const openMap = () => {
       display: flex;
       line-height: 28px;
       height: 22px;
-      
+
       input[type='radio'] {
         appearance: none;
         width: 22px;
@@ -204,7 +189,7 @@ const openMap = () => {
         position: relative;
         margin-right: 12px;
         cursor: pointer;
-    
+
         &:checked {
           background-color: #000;
           border: 2px solid #000;
@@ -213,5 +198,4 @@ const openMap = () => {
     }
   }
 }
-
 </style>
