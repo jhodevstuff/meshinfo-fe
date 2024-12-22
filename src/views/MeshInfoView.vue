@@ -19,8 +19,19 @@
           </div>
         </div>
       </div>
+      <div class="filter">
+        <div class="filter__item" v-for="filter in userFilters" :key="filter.id"
+          :class="{ 'filter__item--active': selectedFilterId === filter.id }" @mousedown="startPress(filter)"
+          @touchstart="startPress(filter)" @mouseup="cancelPress" @mouseleave="cancelPress" @touchend="cancelPress"
+          @touchcancel="cancelPress" @click="chooseFilter(filter)" @contextmenu.prevent="tryOpenFilterOverlay(filter)">
+          {{ filter.name }}
+        </div>
+        <div class="filter__item filter__item--add" @click="openFilterOverlay(null)">
+          +
+        </div>
+      </div>
       <div class="nodes__list" v-show="settingsStore.viewMode === 'normal'">
-        <div class="node" v-for="node in sortedNodes" :key="node.id"
+        <div class="node" v-for="node in filteredAndSortedNodes" :key="node.id"
           v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)">
           <div v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
             :class="['node__online', getNodeStatus(node)]"></div>
@@ -82,7 +93,7 @@
         </div>
       </div>
       <div class="nodes__list nodes__list--compact" v-show="settingsStore.viewMode === 'compact'">
-        <div class="node node__compact" v-for="node in sortedNodes" :key="node.id"
+        <div class="node node__compact" v-for="node in filteredAndSortedNodes" :key="node.id"
           v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)"
           @click.stop="selectDetails('Wähle eine verfügbare Info')">
           <div v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
@@ -195,33 +206,113 @@
             </div>
           </div>
         </div>
+        <div class="filter-overlay" v-if="showFilterOverlay">
+          <div class="filter-overlay__head">
+            <h2>{{ isEditing ? 'Filter bearbeiten' : 'Filter erstellen' }}</h2>
+            <div class="close filter-overlay__close" @click.stop="closeOverlay"></div>
+          </div>
+          <div class="master-nodes margin-12" v-if="enableMasters">
+            <div class="master-nodes__container">
+              <div class="master-nodes__option" v-for="masterNode in filteredMasters" :key="masterNode"
+                :class="(selectedMasterNode == masterNode && meshDataStore.nodesIndex.length > 1) && 'master-nodes__selected'"
+                @click="selectMasterNode(masterNode)">
+                <p class="master-nodes__option--label">
+                  {{ masterNode }} ({{ meshDataStore.data[masterNode]?.knownNodes?.[0]?.shortName || '----' }})
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="filter-overlay__actions">
+            <div class="filter-overlay__actions--part">
+              <input class="filter-overlay__actions--part__item" type="text" v-model="tempFilterName"
+                :disabled="isDefaultFilter" />
+            </div>
+            <div class="filter-overlay__actions--part filter-overlay__actions--part__more">
+              <div class="filter-overlay__actions--part__item" :class="overlaySaveClass" @click.stop="saveFilter">
+                Speichern
+              </div>
+              <div class="filter-overlay__actions--part__item" v-if="isEditing && !isDefaultFilter"
+                @click.stop="deleteFilter">
+                Löschen
+              </div>
+            </div>
+          </div>
+          <div class="filter-overlay__body">
+            <div class="filter-overlay__body--list">
+              <h3 class="filter-overlay__body--list__label">Angezeigte Nodes ({{ nodesInFilter.length }})</h3>
+              <div class="filter-overlay__body--list__item" v-for="node in nodesInFilter" :key="node.id"
+                @click="removeNodeFromFilter(node)">
+                {{ node.longName }}
+              </div>
+              <p v-if="nodesInFilter.length === 0">Wähle verfügbare Nodes um diese im Filter anzuzeigen.</p>
+            </div>
+            <div class="filter-overlay__body--list">
+              <h3 class="filter-overlay__body--list__label">Verfügbar für Filter ({{ availableNodes.length }})</h3>
+              <div class="filter-overlay__body--list__item" v-for="node in availableNodes" :key="node.id"
+                @click="addNodeToFilter(node)">
+                {{ node.longName }}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 </template>
 
 <script setup>
-import { useMeshDataStore } from '@/stores/meshDataStore';
-import { useSettingsStore } from '@/stores/settingsStore';
-import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
+import { useMeshDataStore } from '@/stores/meshDataStore'
+import { useSettingsStore } from '@/stores/settingsStore'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 
-const meshDataStore = useMeshDataStore();
-const settingsStore = useSettingsStore();
-const onlineHistoryCache = new Map();
+let pressTimer = null
+const pressDuration = 200
 
-let intervalId;
+const startPress = (filter) => {
+  pressTimer = setTimeout(() => {
+    tryOpenFilterOverlay(filter)
+  }, pressDuration)
+}
 
-const elapsedSeconds = ref(0);
-const traceRoutesVisible = ref(false);
-const selectedTraceRoute = ref([]);
-const selectedMasterNode = ref(useMeshDataStore().nodesIndex[0]);
-const selectedNode = ref(null);
-const selectedDetails = ref('');
-const nodeOptionsVisible = ref(false);
-const enableMasters = ref(false);
-const nodeImages = ref(['HELTEC_V3', 'TBEAM', 'T_ECHO', 'T_DECK', 'TRACKER_T1000_E', 'RAK4631', 'HELTEC_MESH_NODE_T114']);
-const originalViewMode = ref(null);
+const cancelPress = () => {
+  if (pressTimer !== null) {
+    clearTimeout(pressTimer)
+    pressTimer = null
+  }
+}
 
-const cutOffMasterNodeDays = 1;
-const cutoffMasterNode = Date.now() - cutOffMasterNodeDays * 24 * 60 * 60 * 1000;
+let intervalId
+
+const meshDataStore = useMeshDataStore()
+const settingsStore = useSettingsStore()
+const onlineHistoryCache = new Map()
+
+const elapsedSeconds = ref(0)
+const traceRoutesVisible = ref(false)
+const selectedTraceRoute = ref([])
+const selectedMasterNode = ref(useMeshDataStore().nodesIndex[0])
+const selectedNode = ref(null)
+const selectedDetails = ref('')
+const nodeOptionsVisible = ref(false)
+const enableMasters = ref(false)
+const nodeImages = ref([
+  'HELTEC_V3', 'TBEAM', 'T_ECHO',
+  'T_DECK', 'TRACKER_T1000_E',
+  'RAK4631', 'HELTEC_MESH_NODE_T114'
+])
+const originalViewMode = ref(null)
+const userFilters = ref([])
+const selectedFilter = ref(null)
+const selectedFilterId = ref('')
+const showFilterOverlay = ref(false)
+const isEditing = ref(false)
+const tempFilterIndex = ref(-1)
+const tempFilterName = ref('')
+const tempFilterNodeIds = ref([])
+const isDefaultFilterFn = (filter) => {
+  const idx = userFilters.value.findIndex(f => f.id === filter.id)
+  return idx === 0
+}
+const cutOffMasterNodeDays = 1
+const cutoffMasterNode = Date.now() - cutOffMasterNodeDays * 24 * 60 * 60 * 1000
 
 const modelShortNames = {
   TRACKER_T1000_E: 'T1000E',
@@ -236,317 +327,448 @@ const modelShortNames = {
   UNSET: '?'
 }
 
-const sortedNodes = computed(() => {
-  const nodes = meshDataStore.data[selectedMasterNode.value]?.knownNodes || [];
-  const masterNodeId = meshDataStore.data[selectedMasterNode.value]?.info?.infoFrom;
-  let arr;
-  if (settingsStore.sortMode === 'lastHeard') {
-    arr = [...nodes].sort((a, b) => (b.lastHeard || 0) - (a.lastHeard || 0));
-  } else {
-    arr = [...nodes];
-  }
-  if (masterNodeId) {
-    const index = arr.findIndex(n => n.id === masterNodeId);
-    if (index > 0) {
-      const [masterNode] = arr.splice(index, 1);
-      arr.unshift(masterNode);
-    }
-  }
-  return arr;
+const tryOpenFilterOverlay = (filter) => {
+  if (isDefaultFilterFn(filter)) return
+  openFilterOverlay(filter)
+}
+
+const availableNodes = computed(() => {
+  const nodes = meshDataStore.data[selectedMasterNode.value]?.knownNodes || []
+  return nodes.filter(n => !tempFilterNodeIds.value.includes(n.id))
 })
 
-const graphWidth = 600;
-const graphHeight = 300;
-const padding = { top: 10, bottom: 30, left: 40, right: 18 };
+const nodesInFilter = computed(() => {
+  const nodes = meshDataStore.data[selectedMasterNode.value]?.knownNodes || []
+  return nodes.filter(n => tempFilterNodeIds.value.includes(n.id))
+})
 
-function formatDayMonth(timestamp) {
-  const d = new Date(timestamp);
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  return `${day}.${month}.`;
+const isDefaultFilter = computed(() => {
+  if (tempFilterIndex.value === 0) return true
+  return false
+})
+
+const overlaySaveClass = computed(() => {
+  return isDefaultFilter.value ? 'details__actions--item__selected' : null
+})
+
+const loadLastFilterUsed = () => {
+  const lastUsedId = localStorage.getItem('lastUsedFilter') || ''
+  if (!lastUsedId) return
+  const found = userFilters.value.find(f => f.id === lastUsedId)
+  if (found) {
+    selectedFilter.value = found
+    selectedFilterId.value = found.id
+  }
+}
+
+const openFilterOverlay = (filter) => {
+  if (!filter) {
+    isEditing.value = false
+    tempFilterIndex.value = -1
+    tempFilterName.value = 'Neuer Filter'
+    tempFilterNodeIds.value = []
+  } else {
+    isEditing.value = true
+    const idx = userFilters.value.findIndex(f => f.id === filter.id)
+    tempFilterIndex.value = idx
+    tempFilterName.value = filter.name
+    tempFilterNodeIds.value = [...(filter.nodeIds || [])]
+  }
+  showFilterOverlay.value = true
+}
+
+const addNodeToFilter = (node) => {
+  if (!tempFilterNodeIds.value.includes(node.id)) {
+    tempFilterNodeIds.value.push(node.id)
+  }
+}
+
+const removeNodeFromFilter = (node) => {
+  tempFilterNodeIds.value = tempFilterNodeIds.value.filter(id => id !== node.id)
+}
+
+const saveFilter = () => {
+  if (isDefaultFilter.value) return
+  const name = tempFilterName.value.trim()
+  if (!name) return
+  let thisFilterId
+  if (isEditing.value && tempFilterIndex.value >= 0) {
+    thisFilterId = userFilters.value[tempFilterIndex.value].id
+  } else {
+    thisFilterId = `filter_${Date.now()}`
+  }
+  const newFilter = {
+    id: thisFilterId,
+    name: name,
+    nodeIds: [...tempFilterNodeIds.value]
+  }
+  if (isEditing.value && tempFilterIndex.value >= 0) {
+    userFilters.value[tempFilterIndex.value] = newFilter
+  } else {
+    userFilters.value.push(newFilter)
+  }
+  selectedFilter.value = newFilter
+  selectedFilterId.value = newFilter.id
+  localStorage.setItem('lastUsedFilter', newFilter.id)
+  saveFiltersToStorage()
+  closeOverlay()
+}
+
+const deleteFilter = () => {
+  if (!isEditing.value) return
+  if (tempFilterIndex.value < 0) return
+  if (isDefaultFilter.value) return
+  userFilters.value.splice(tempFilterIndex.value, 1)
+  saveFiltersToStorage()
+  closeOverlay()
+}
+
+const closeOverlay = () => {
+  showFilterOverlay.value = false
+}
+
+const filteredAndSortedNodes = computed(() => {
+  let arr = sortedNodes.value
+  if (!selectedFilter.value) return arr
+  if (!selectedFilter.value.nodeIds || !selectedFilter.value.nodeIds.length) {
+    return arr
+  }
+  return arr.filter(node => selectedFilter.value.nodeIds.includes(node.id))
+})
+
+const loadFiltersFromStorage = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('myNodeFilters') || '[]')
+    userFilters.value = Array.isArray(saved)
+      ? saved.map((f, idx) => {
+          if (!f.id) {
+            f.id = `filter_${idx + 1}`
+          }
+          return f
+        })
+      : []
+  } catch (err) {
+    userFilters.value = []
+  }
+}
+
+const saveFiltersToStorage = () => {
+  localStorage.setItem('myNodeFilters', JSON.stringify(userFilters.value))
+}
+
+const chooseFilter = (filter) => {
+  selectedFilter.value = filter
+  selectedFilterId.value = filter.id
+  localStorage.setItem('lastUsedFilter', filter.id)
+}
+
+const sortedNodes = computed(() => {
+  const nodes = meshDataStore.data[selectedMasterNode.value]?.knownNodes || []
+  const masterNodeId = meshDataStore.data[selectedMasterNode.value]?.info?.infoFrom
+  let arr
+  if (settingsStore.sortMode === 'lastHeard') {
+    arr = [...nodes].sort((a, b) => (b.lastHeard || 0) - (a.lastHeard || 0))
+  } else {
+    arr = [...nodes]
+  }
+  if (masterNodeId) {
+    const index = arr.findIndex(n => n.id === masterNodeId)
+    if (index > 0) {
+      const [masterNode] = arr.splice(index, 1)
+      arr.unshift(masterNode)
+    }
+  }
+  return arr
+})
+
+const graphWidth = 600
+const graphHeight = 300
+const padding = { top: 10, bottom: 30, left: 40, right: 18 }
+
+const formatDayMonth = (timestamp) => {
+  const d = new Date(timestamp)
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  return `${day}.${month}.`
 }
 
 const processedData = computed(() => {
-  const data = getBatteryLevelHistory(selectedNode.value);
-  if (!data.length) return [];
-  const minValue = 0;
-  const maxValue = 100;
+  const data = getBatteryLevelHistory(selectedNode.value)
+  if (!data.length) return []
+  const minValue = 0
+  const maxValue = 100
   const timeRange = [
-    Math.min(...data.map((entry) => entry.timestamp)),
-    Math.max(...data.map((entry) => entry.timestamp)),
-  ];
-  return data.map((entry) => {
-    const x =
-      padding.left +
-      ((entry.timestamp - timeRange[0]) /
-        (timeRange[1] - timeRange[0])) *
-      (graphWidth - padding.left - padding.right);
-    const y =
-      graphHeight -
-      padding.bottom -
-      ((entry.state - minValue) / (maxValue - minValue)) *
-      (graphHeight - padding.top - padding.bottom);
-    return { x, y };
-  });
+    Math.min(...data.map(entry => entry.timestamp)),
+    Math.max(...data.map(entry => entry.timestamp))
+  ]
+  return data.map(entry => {
+    const x = padding.left
+      + ((entry.timestamp - timeRange[0]) / (timeRange[1] - timeRange[0]))
+      * (graphWidth - padding.left - padding.right)
+    const y = graphHeight - padding.bottom
+      - ((entry.state - minValue) / (maxValue - minValue))
+      * (graphHeight - padding.top - padding.bottom)
+    return { x, y }
+  })
 })
 
 const yAxisLabels = computed(() => {
-  const levels = [25, 50, 75, 100];
-  return levels.map((level) => ({
+  const levels = [25, 50, 75, 100]
+  return levels.map(level => ({
     label: `${level}%`,
-    y:
-      graphHeight -
-      padding.bottom -
-      (level / 100) * (graphHeight - padding.top - padding.bottom),
-  }));
+    y: graphHeight - padding.bottom
+      - (level / 100) * (graphHeight - padding.top - padding.bottom)
+  }))
 })
 
 const xAxisLabels = computed(() => {
-  const data = getBatteryLevelHistory(selectedNode.value);
-  if (!data.length) return [];
+  const data = getBatteryLevelHistory(selectedNode.value)
+  if (!data.length) return []
   const timeRange = [
-    Math.min(...data.map((entry) => entry.timestamp)),
-    Math.max(...data.map((entry) => entry.timestamp)),
-  ];
-  const step = (timeRange[1] - timeRange[0]) / 4;
-  const labels = [];
+    Math.min(...data.map(e => e.timestamp)),
+    Math.max(...data.map(e => e.timestamp))
+  ]
+  const step = (timeRange[1] - timeRange[0]) / 4
+  const labels = []
   for (let i = 0; i <= 4; i++) {
-    const timestamp = timeRange[0] + i * step;
+    const timestamp = timeRange[0] + i * step
     labels.push({
       date: formatDayMonth(timestamp),
       label: formatTimeOnly(timestamp),
-      x:
-        padding.left +
-        ((timestamp - timeRange[0]) /
-          (timeRange[1] - timeRange[0])) *
-        (graphWidth - padding.left - padding.right),
-    });
+      x: padding.left
+        + ((timestamp - timeRange[0]) / (timeRange[1] - timeRange[0]))
+        * (graphWidth - padding.left - padding.right)
+    })
   }
-  return labels;
+  return labels
 })
 
 const generatePolylinePoints = () => {
-  return processedData.value
-    .map((point) => `${point.x},${point.y}`)
-    .join(" ");
+  return processedData.value.map(point => `${point.x},${point.y}`).join(' ')
 }
 
 const formatTimeOnly = (timestamp) => {
-  const date = new Date(timestamp);
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${hours}:${minutes}`;
+  const date = new Date(timestamp)
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
 }
 
 const filteredMasters = computed(() => {
   return meshDataStore.nodesIndex.filter(masterNodeId => {
-    const masterNode = meshDataStore.data[masterNodeId]?.knownNodes?.[0];
-    if (!masterNode || !masterNode.lastHeard) return false;
-    return masterNode.lastHeard >= cutoffMasterNode;
-  });
+    const masterNode = meshDataStore.data[masterNodeId]?.knownNodes?.[0]
+    if (!masterNode || !masterNode.lastHeard) return false
+    return masterNode.lastHeard >= cutoffMasterNode
+  })
 })
 
 const selectMasterNode = (nodeId) => {
-  selectedMasterNode.value = nodeId;
-  localStorage.setItem('masterNode', nodeId);
+  selectedMasterNode.value = nodeId
+  localStorage.setItem('masterNode', nodeId)
 }
 
 const copy = (copyValue) => {
-  navigator.clipboard.writeText(copyValue);
+  navigator.clipboard.writeText(copyValue)
 }
 
 const selectNode = (nodeId) => {
   if (nodeId === selectedNode.nodeId) {
-    selectedNode.value = null;
-    nodeOptionsVisible.value = false;
-    selectedDetails.value = false;
+    selectedNode.value = null
+    nodeOptionsVisible.value = false
+    selectedDetails.value = false
   } else {
-    selectedNode.value = nodeId;
-    nodeOptionsVisible.value = true;
+    selectedNode.value = nodeId
+    nodeOptionsVisible.value = true
   }
 }
 
 const selectDetails = (type) => {
-  selectedDetails.value = type;
-  nodeOptionsVisible.value = false;
+  selectedDetails.value = type
+  nodeOptionsVisible.value = false
   if (originalViewMode.value === null) {
-    originalViewMode.value = settingsStore.viewMode;
+    originalViewMode.value = settingsStore.viewMode
   }
   if (settingsStore.viewMode === 'compact') {
-    settingsStore.setViewMode('normal');
+    settingsStore.setViewMode('normal')
   }
   if (type === 'Traceroutes') {
     meshDataStore.data[selectedMasterNode.value].traceroutes.forEach((tr) => {
       if (tr.nodeId === selectedNode.value) {
-        selectedTraceRoute.value = tr.traces;
-        traceRoutesVisible.value = true;
-        window.scrollTo(0, 0);
+        selectedTraceRoute.value = tr.traces
+        traceRoutesVisible.value = true
+        window.scrollTo(0, 0)
       }
-    });
+    })
   }
 }
 
 const close = () => {
-  selectedNode.value = null;
-  nodeOptionsVisible.value = false;
-  selectedDetails.value = false;
+  selectedNode.value = null
+  nodeOptionsVisible.value = false
+  selectedDetails.value = false
   if (originalViewMode.value !== null) {
-    settingsStore.setViewMode(originalViewMode.value);
-    originalViewMode.value = null;
+    settingsStore.setViewMode(originalViewMode.value)
+    originalViewMode.value = null
   }
 }
 
 const getBatteryLevelHistory = (nodeId) => {
   const node = meshDataStore.data[selectedMasterNode.value].knownNodes.find(
-    (node) => node.id === nodeId
-  );
-  return node?.power?.batteryLevel || [];
+    n => n.id === nodeId
+  )
+  return node?.power?.batteryLevel || []
 }
 
 const getOnlineHistory = (nodeId) => {
-  const cacheKey = selectedMasterNode.value + '#' + nodeId;
-  if (onlineHistoryCache.has(cacheKey)) return onlineHistoryCache.get(cacheKey);
-  if (onlineHistoryCache.has(nodeId)) return onlineHistoryCache.get(nodeId);
+  const cacheKey = selectedMasterNode.value + '#' + nodeId
+  if (onlineHistoryCache.has(cacheKey)) return onlineHistoryCache.get(cacheKey)
+  if (onlineHistoryCache.has(nodeId)) return onlineHistoryCache.get(nodeId)
 
   const node = meshDataStore.data[selectedMasterNode.value].knownNodes.find(
-    (node) => node.id === nodeId
-  );
-  if (!node) return { days: [], times: [] };
+    n => n.id === nodeId
+  )
+  if (!node) return { days: [], times: [] }
 
   if (!node._onlineFormatted) {
-    node._onlineFormatted = node.online.map(ts => formatOnlineTimestamp(ts));
+    node._onlineFormatted = node.online.map(ts => formatOnlineTimestamp(ts))
   }
 
-  let onlineGraphNew = { days: [], times: [] };
-
-  let daysMap = new Map();
+  let onlineGraphNew = { days: [], times: [] }
+  let daysMap = new Map()
   node._onlineFormatted.forEach((ts) => {
-    const key = ts.day + '.' + ts.month + '.';
+    const key = ts.day + '.' + ts.month + '.'
     if (!daysMap.has(key)) {
-      daysMap.set(key, new Array(24).fill(false));
-      onlineGraphNew.days.push(key);
+      daysMap.set(key, new Array(24).fill(false))
+      onlineGraphNew.days.push(key)
     }
-    const arr = daysMap.get(key);
-    arr[parseInt(ts.hours, 10)] = true;
-    daysMap.set(key, arr);
-  });
+    const arr = daysMap.get(key)
+    arr[parseInt(ts.hours, 10)] = true
+    daysMap.set(key, arr)
+  })
 
-  onlineGraphNew.times = [...daysMap.values()];
-  onlineHistoryCache.set(cacheKey, onlineGraphNew);
-  return onlineGraphNew;
+  onlineGraphNew.times = [...daysMap.values()]
+  onlineHistoryCache.set(cacheKey, onlineGraphNew)
+  return onlineGraphNew
 }
 
 const formatRoute = (nodeIds) => {
   return nodeIds
     .map(id => {
-      const node = meshDataStore.data[selectedMasterNode.value].knownNodes.find(n => n.id === id);
-      return node ? `${id} (${node.shortName})` : id;
+      const node = meshDataStore.data[selectedMasterNode.value].knownNodes.find(n => n.id === id)
+      return node ? `${id} (${node.shortName})` : id
     })
-    .join(" → ");
+    .join(' → ')
 }
 
 const getLastTraceTimestampMillis = (nodeId) => {
-  const traceroute = meshDataStore.data[selectedMasterNode.value].traceroutes.find(tr => tr.nodeId === nodeId);
+  const traceroute = meshDataStore.data[selectedMasterNode.value].traceroutes.find(tr => tr.nodeId === nodeId)
   if (traceroute && traceroute.traces.length > 0) {
-    return traceroute.traces[traceroute.traces.length - 1].timeStamp;
+    return traceroute.traces[traceroute.traces.length - 1].timeStamp
   }
-  return null;
+  return null
 }
 
 const formatTimestamp = (timestamp) => {
-  const date = new Date(timestamp);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = String(date.getFullYear()).slice(-2);
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${day}.${month}.${year} - ${hours}:${minutes}`;
+  const date = new Date(timestamp)
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = String(date.getFullYear()).slice(-2)
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${day}.${month}.${year} - ${hours}:${minutes}`
 }
 
 const formatOnlineTimestamp = (timestamp) => {
-  const date = new Date(timestamp);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = String(date.getFullYear()).slice(-2);
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const date = new Date(timestamp)
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = String(date.getFullYear()).slice(-2)
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
 
-  const returnValue = {
-    day: day,
-    month: month,
-    year: year,
-    hours: hours,
-    minutes: minutes
-  }
-  return returnValue;
+  return { day, month, year, hours, minutes }
 }
 
 const getNodeStatus = (node) => {
-  const colorStatesHours = {
-    green: 1.5,
-    orange: 6
-  };
-  const oneHour = 60 * 60 * 1000;
-  const recent = colorStatesHours.green * oneHour;
-  const long = colorStatesHours.orange * oneHour;
-  const currentTime = Date.now();
-  const lastHeardTime = node.lastHeard ? node.lastHeard : null;
-  const lastTraceTime = getLastTraceTimestampMillis(node.id);
-  const latestTime = Math.max(lastHeardTime || 0, lastTraceTime || 0);
+  const colorStatesHours = { green: 1.5, orange: 6 }
+  const oneHour = 60 * 60 * 1000
+  const recent = colorStatesHours.green * oneHour
+  const long = colorStatesHours.orange * oneHour
+  const currentTime = Date.now()
+  const lastHeardTime = node.lastHeard ? node.lastHeard : null
+  const lastTraceTime = getLastTraceTimestampMillis(node.id)
+  const latestTime = Math.max(lastHeardTime || 0, lastTraceTime || 0)
   if (latestTime > currentTime - recent) {
-    return 'node__online--short';
+    return 'node__online--short'
   } else if (latestTime > currentTime - long) {
-    return 'node__online--recent';
+    return 'node__online--recent'
   } else {
-    return 'node__online--long';
+    return 'node__online--long'
   }
 }
 
 const getLastTraceTimestamp = (nodeId) => {
-  const traceroute = meshDataStore.data[selectedMasterNode.value].traceroutes.find(tr => tr.nodeId === nodeId);
+  const traceroute = meshDataStore.data[selectedMasterNode.value].traceroutes.find(tr => tr.nodeId === nodeId)
   if (traceroute && traceroute.traces.length > 0) {
-    const lastTimestamp = traceroute.traces[traceroute.traces.length - 1].timeStamp;
-    return getTraceTimestamp(lastTimestamp);
+    const lastTimestamp = traceroute.traces[traceroute.traces.length - 1].timeStamp
+    return getTraceTimestamp(lastTimestamp)
   }
-  return null;
+  return null
 }
 
 const getTraceTimestamp = (timeStamp) => {
-  const date = new Date(timeStamp);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = String(date.getFullYear()).slice(-2);
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${day}.${month}.${year} - ${hours}:${minutes}`;
+  const date = new Date(timeStamp)
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = String(date.getFullYear()).slice(-2)
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${day}.${month}.${year} - ${hours}:${minutes}`
 }
 
 const startTimer = () => {
-  elapsedSeconds.value = Math.floor((Date.now() - meshDataStore.data[selectedMasterNode.value].info.lastUpdated) / 1000);
-  clearInterval(intervalId);
+  elapsedSeconds.value = Math.floor(
+    (Date.now() - meshDataStore.data[selectedMasterNode.value].info.lastUpdated) / 1000
+  )
+  clearInterval(intervalId)
   intervalId = setInterval(() => {
-    elapsedSeconds.value++;
-  }, 1000);
+    elapsedSeconds.value++
+  }, 1000)
 }
 
 onMounted(() => {
-  startTimer();
-  enableMasters.value = true;
+  startTimer()
+  enableMasters.value = true
+})
+
+onMounted(() => {
+  loadFiltersFromStorage()
+  if (!userFilters.value.length) {
+    userFilters.value.push({
+      id: 'filter_default',
+      name: 'Alle Nodes',
+      nodeIds: []
+    })
+    saveFiltersToStorage()
+  }
+  loadLastFilterUsed()
+  if (!selectedFilter.value) {
+    selectedFilter.value = userFilters.value[0]
+    selectedFilterId.value = userFilters.value[0].id
+  }
 })
 
 watch(() => meshDataStore.data[selectedMasterNode.value], startTimer)
 
-watch(
-  () => selectedMasterNode.value,
-  () => {
-    if (selectedDetails.value === 'Traceroutes') {
-      const tr = meshDataStore.data[selectedMasterNode.value]
-        .traceroutes.find(x => x.nodeId === selectedNode.value);
-      selectedTraceRoute.value = tr ? tr.traces : [];
-      traceRoutesVisible.value = !!tr;
-    }
+watch(() => selectedMasterNode.value, () => {
+  if (selectedDetails.value === 'Traceroutes') {
+    const tr = meshDataStore.data[selectedMasterNode.value].traceroutes.find(
+      x => x.nodeId === selectedNode.value
+    )
+    selectedTraceRoute.value = tr ? tr.traces : []
+    traceRoutesVisible.value = !!tr
   }
-);
+})
 
 onUnmounted(() => clearInterval(intervalId))
 </script>
@@ -967,6 +1189,141 @@ onUnmounted(() => clearInterval(intervalId))
 
 .state-online {
   background-color: rgb(12, 123, 12) !important;
+}
+
+.filter {
+  display: flex;
+  gap: 6px;
+  font-size: 16px;
+
+  &__item {
+    background-color: rgb(40, 40, 40);
+    padding: 12px 16px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: border 0.2s, background-color 0.2s;
+    border: 1px solid rgb(40, 40, 40);
+    user-select: none;
+  }
+
+  &__item--active {
+    border: 1px solid rgb(80, 80, 80);
+  }
+
+  &__item--add {
+    font-size: 22px;
+    line-height: 16px;
+  }
+}
+
+.filter-overlay {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  width: 100%;
+  height: calc(100% - 60px);
+  background: #181818;
+  display: flex;
+  flex-direction: column;
+
+  &__head {
+    padding: 20px 12px;
+    font-size: 20px;
+    font-weight: bold;
+    position: relative;
+
+    .close {
+      position: absolute;
+      top: 20px;
+      right: 12px;
+      width: 24px;
+      height: 24px;
+      background: url('/src/assets/icons/x.svg') center/contain no-repeat;
+      cursor: pointer;
+    }
+  }
+
+  &__actions {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    &--part {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+
+      &__more {
+        flex-direction: row;
+      }
+
+      &__item {
+        background-color: rgb(40, 40, 40);
+        padding: 12px 16px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+
+      input[type='text'] {
+        padding: 12px 16px;
+        color: #fff;
+        border-radius: 3px;
+        border: none;
+        cursor: text;
+      }
+    }
+  }
+
+  &__body {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    padding: 24px 12px;
+    gap: 12px;
+    overflow: hidden;
+
+    &--list {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      max-height: 100%;
+      overflow-y: scroll;
+
+      &::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      &::-webkit-scrollbar-thumb {
+        background-color: #888;
+      }
+
+      &::-webkit-scrollbar-track {
+        background-color: #444;
+      }
+
+      &__label {
+        font-size: 16px;
+        font-weight: bold;
+        margin-bottom: 12px;
+      }
+
+      &__item {
+        background-color: rgb(40, 40, 40);
+        padding: 8px;
+        border-radius: 3px;
+        cursor: pointer;
+        margin-right: 6px;
+      }
+    }
+  }
+}
+
+.margin-12 {
+  margin: 0 12px;
 }
 
 </style>
