@@ -68,8 +68,15 @@
                 === 1 ? 'Hop' : 'Hops' }}</p>
             </div>
             <div class="node__info--block" v-if="node.lat && node.lon">
-              <p> 🌍 <a :href="`https://www.google.com/maps?q=${node.lat},${node.lon}`" target="_blank"> {{ node.lat }},
-                  {{ node.lon }} </a> </p>
+              <p> 🌍
+                <a v-if="settingsStore.verificationMode" :href="`https://www.google.com/maps?q=${node.lat},${node.lon}`"
+                  target="_blank">
+                  {{ node.lat }}, {{ node.lon }}
+                </a>
+                <span v-else>
+                  Bitte erst verifizieren
+                </span>
+              </p>
             </div>
             <p v-if="node.publicKey" class="node__info--block"> <a href="#" @click="copy(node.publicKey)"> 🔑 PublicKey
                 kopieren </a> </p>
@@ -742,6 +749,7 @@ onMounted(() => {
 })
 
 onMounted(() => {
+  localStorage.setItem('group', 'wor'); // users are wor/ger at the moment; delete later!
   loadFiltersFromStorage()
   if (!userFilters.value.length) {
     userFilters.value.push({
@@ -1176,7 +1184,7 @@ onUnmounted(() => clearInterval(intervalId))
       padding-bottom: 6px;
 
       &--item {
-        background-color:  rgb(173, 66, 0);
+        background-color:  rgb(40, 40, 40);
         width: 16px;
         height: 16px;
         font-size: 14px;

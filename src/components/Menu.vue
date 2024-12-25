@@ -2,14 +2,14 @@
   <div class="header">
     <div class="header-row">
       <div class="header__left">
-        <div class="header__logo"></div>
+        <div class="header__logo" @click="clickLogo"></div>
         <div class="header__info">
           <h1 class="header__info--headline">eshinfo</h1>
           <p class="header__info--text">by Joshua Hoffmann</p>
         </div>
       </div>
       <div class="header__right">
-        <div class="map" :class="{ closemap: isMapRoute }" @click="isMapRoute ? closeMap() : goMap()"></div>
+        <div class="map" :class="{ closemap: isMapRoute }" @click="isMapRoute ? closeMap() : goMap()" v-show="settingsStore.verificationMode"></div>
         <div class="settings" @click="toggleSettings"></div>
       </div>
     </div>
@@ -52,8 +52,12 @@ const settingsVisible = ref(false)
 const settingsStore = useSettingsStore()
 const viewMode = ref(settingsStore.viewMode)
 const sortMode = ref(settingsStore.sortMode)
+const verificationMode = ref(settingsStore.verificationMode)
+const clicksToVerify = 5;
 
 const isMapRoute = computed(() => route.path === '/map')
+
+let actionClick = 0;
 
 const goMap = () => {
   router.push('/map')
@@ -76,6 +80,14 @@ const updateSortMode = () => {
   settingsStore.setSortMode(sortMode.value)
   settingsVisible.value = false
 }
+
+const clickLogo = () => {
+  actionClick += 1;
+  if (actionClick >= clicksToVerify) {
+    settingsStore.setVerification(true)
+  }
+}
+
 </script>
 
 <style scoped lang="scss">
