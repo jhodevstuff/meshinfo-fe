@@ -1,0 +1,37 @@
+{
+  "info": {
+    "lastUpdated": 1027841880,
+    "infoFrom": "!ffffffff"
+  },
+  "knownNodes": [
+    {
+      "id": "!ffffffff",
+      "longName": "Masternode",
+      "shortName": "MAST",
+      "lastHeard": 0,
+      "batteryLevel": 100,
+      "snr": null,
+      "hops": 0,
+      "uptimeSeconds": 0,
+      "lat": null,
+      "lon": null,
+      "lastTracerouteSuccess": null,
+      "lastTracerouteAttempt": null,
+      "online": []
+    }
+  ],
+  "traceroutes": [
+    {
+      "nodeId": "!ffffffff",
+      "traces": [
+        {
+          "nodeId": "!ffffffff",
+          "timeStamp": 0,
+          "nodeTraceTo": ["!ffffffff", "!ffffffff"],
+          "nodeTraceFrom": ["!ffffffff", "!ffffffff"],
+          "hops": 0
+        }
+      ]
+    }
+  ]
+}

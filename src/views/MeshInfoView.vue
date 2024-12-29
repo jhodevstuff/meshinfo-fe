@@ -2,7 +2,9 @@
   <div>
     <div class="nodes" v-if="selectedMasterNode">
       <div class="nodes__info">
-        <p class="nodes__info--total">Nodes gesamt: {{ meshDataStore.data[selectedMasterNode].knownNodes.length }}</p>
+        <p v-if="meshDataStore.data[selectedMasterNode]">
+          Nodes gesamt: {{ meshDataStore.data[selectedMasterNode].knownNodes.length }}
+        </p>
         <div class="nodes__info--update">
           <p>{{ elapsedSeconds }}</p>
           <p>Sekunden seit Update {{ elapsedSeconds > 3600 ? '👀' : null }}</p>
@@ -29,6 +31,9 @@
         <div class="filter__item filter__item--add" @click="openFilterOverlay(null)">
           +
         </div>
+      </div>
+      <div class="loading" v-if="selectedMasterNode === '!ffffffff'">
+        Daten werden geladen, bitte warten...
       </div>
       <div class="nodes__list" v-show="settingsStore.viewMode === 'normal'">
         <div class="node" v-for="node in filteredAndSortedNodes" :key="node.id"
@@ -127,7 +132,7 @@
                 v-if="getLastTraceTimestamp(node.id)" @click.stop="selectDetails('Traceroutes')">🔭 Traceroutes</div>
           </div>
           <p class="details__headline">{{ selectedDetails }}</p>
-          <div class="close" @click.stop="close"></div>
+          <div class="close close__larger" @click.stop="close"></div>
           <div class="traceroutes-container" v-if="selectedTraceRoute && selectedDetails === 'Traceroutes'">
             <div v-for="(tr, index) in selectedTraceRoute" :key="index" class="traceroutes">
               <p class="traceroutes__time">{{ getTraceTimestamp(tr.timeStamp) }} - Tracroute mit {{ tr.hops }} {{
@@ -262,6 +267,10 @@
             </div>
           </div>
         </div>
+      </div>
+      <div class="footnote" v-if="!selectedDetails && meshDataStore.data[selectedMasterNode]">
+        <p>meshinfo (frontend) version: 2024-12-29</p>
+        <p>entwickelt mit ❤️ und 🍷 von <a href="http://github.com/jhodevstuff">joshua hoffmann</a></p>
       </div>
 </template>
 
@@ -564,7 +573,7 @@ const formatTimeOnly = (timestamp) => {
 const filteredMasters = computed(() => {
   return meshDataStore.nodesIndex.filter(masterNodeId => {
     const masterNode = meshDataStore.data[masterNodeId]?.knownNodes?.[0]
-    if (!masterNode || !masterNode.lastHeard) return false
+    if (!masterNode || masterNode.lastHeard === undefined) return false
     return masterNode.lastHeard >= cutoffMasterNode
   })
 })
@@ -692,7 +701,6 @@ const formatOnlineTimestamp = (timestamp) => {
   const year = String(date.getFullYear()).slice(-2)
   const hours = String(date.getHours()).padStart(2, '0')
   const minutes = String(date.getMinutes()).padStart(2, '0')
-
   return { day, month, year, hours, minutes }
 }
 
@@ -734,8 +742,12 @@ const getTraceTimestamp = (timeStamp) => {
 }
 
 const startTimer = () => {
+  const nodeData = meshDataStore.data[selectedMasterNode.value]
+  if (!nodeData?.info?.lastUpdated) {
+    return
+  }
   elapsedSeconds.value = Math.floor(
-    (Date.now() - meshDataStore.data[selectedMasterNode.value].info.lastUpdated) / 1000
+    (Date.now() - nodeData.info.lastUpdated) / 1000
   )
   clearInterval(intervalId)
   intervalId = setInterval(() => {
@@ -743,13 +755,20 @@ const startTimer = () => {
   }, 1000)
 }
 
-onMounted(() => {
-  startTimer()
-  enableMasters.value = true
+watch(() => meshDataStore.data[selectedMasterNode.value], startTimer)
+
+watch(() => selectedMasterNode.value, () => {
+  if (selectedDetails.value === 'Traceroutes') {
+    const tr = meshDataStore.data[selectedMasterNode.value].traceroutes.find(
+      x => x.nodeId === selectedNode.value
+    )
+    selectedTraceRoute.value = tr ? tr.traces : []
+    traceRoutesVisible.value = !!tr
+  }
 })
 
-onMounted(() => {
-  localStorage.setItem('group', 'wor'); // users are wor/ger at the moment; delete later!
+onMounted(async () => {
+  enableMasters.value = true
   loadFiltersFromStorage()
   if (!userFilters.value.length) {
     userFilters.value.push({
@@ -764,18 +783,34 @@ onMounted(() => {
     selectedFilter.value = userFilters.value[0]
     selectedFilterId.value = userFilters.value[0].id
   }
-})
-
-watch(() => meshDataStore.data[selectedMasterNode.value], startTimer)
-
-watch(() => selectedMasterNode.value, () => {
-  if (selectedDetails.value === 'Traceroutes') {
-    const tr = meshDataStore.data[selectedMasterNode.value].traceroutes.find(
-      x => x.nodeId === selectedNode.value
-    )
-    selectedTraceRoute.value = tr ? tr.traces : []
-    traceRoutesVisible.value = !!tr
+  while (!meshDataStore.isLoaded) {
+    await new Promise((resolve) => setTimeout(resolve, 50))
   }
+  const lastSelected = localStorage.getItem('masterNode')
+  // funktioniert noch nicht so richtig
+  if (
+    lastSelected &&
+    meshDataStore.nodesIndex.includes(lastSelected) &&
+    filteredMasters.value.includes(lastSelected) &&
+    lastSelected !== '!ffffffff'
+  ) {
+    selectedMasterNode.value = lastSelected
+  } else {
+    const validMasters = filteredMasters.value.filter(m => m !== '!ffffffff')
+    if (validMasters.length) {
+      selectedMasterNode.value = validMasters[0]
+    }
+  }
+  if (
+    meshDataStore.nodesIndex.includes('!ffffffff') &&
+    selectedMasterNode.value === '!ffffffff'
+  ) {
+    const idx = meshDataStore.nodesIndex.indexOf('!ffffffff')
+    if (idx < meshDataStore.nodesIndex.length - 1) {
+      selectedMasterNode.value = meshDataStore.nodesIndex[idx + 1]
+    }
+  }
+  startTimer()
 })
 
 onUnmounted(() => clearInterval(intervalId))
@@ -1090,6 +1125,12 @@ onUnmounted(() => clearInterval(intervalId))
     top: 24px;
     right: 24px;
   }
+
+  &__larger {
+    padding-top: 12px; // just don't ask why
+    width: 28px;
+    height: 28px;
+  }
 }
 
 .traceroutes-container {
@@ -1334,4 +1375,18 @@ onUnmounted(() => clearInterval(intervalId))
   margin: 0 12px;
 }
 
+.footnote {
+  margin: 36px 12px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  opacity: 0.6;
+  font-size: 12px;
+  font-family: monospace;
+
+  a {
+    text-decoration: underline;
+  }
+}
 </style>
