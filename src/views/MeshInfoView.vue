@@ -1382,7 +1382,7 @@ onUnmounted(() => clearInterval(intervalId))
   flex-direction: column;
   gap: 6px;
   opacity: 0.6;
-  font-size: 12px;
+  font-size: 12px !important;
   font-family: monospace;
 
   a {
