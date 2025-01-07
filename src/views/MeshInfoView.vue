@@ -123,7 +123,7 @@
         <div class="details__actions--item" :class="selectedDetails === 'Online' && 'details__actions--item__selected'"
           v-if="node.online.length > 1" @click.stop="selectDetails('Online')">⏳ Online</div>
         <div class="details__actions--item"
-          :class="selectedDetails === 'Batteriestand' && 'details__actions--item__selected'"
+          :class="selectedDetails === 'Stromversorgung' && 'details__actions--item__selected'"
           v-if="node.power.batteryLevel.length > 1 || node.power.voltage.length > 1"
           @click.stop="selectDetails('Stromversorgung')">⚡️ Stromversorgung</div>
         <div class="details__actions--item"
