@@ -94,184 +94,220 @@
               <div class="node__actions--options__item" v-if="node.online.length > 1"
                 @click.stop="selectDetails('Online')">
                 ⏳ Online</div>
-              <div class="node__actions--options__item" v-if="node.power.batteryLevel.length > 1"
-                @click.stop="selectDetails('Batteriestand')">{{ (node.batteryLevel < 35) ? '🪫' : '🔋' }}
-                  Batteriestand</div>
-                  <div class="node__actions--options__item" v-if="getLastTraceTimestamp(node.id)"
-                    @click.stop="selectDetails('Traceroutes')">🔭 Traceroutes</div>
+              <div class="node__actions--options__item"
+                v-if="node.power.batteryLevel.length > 1 || node.power.voltage.length > 1"
+                @click.stop="selectDetails('Stromversorgung')">⚡️ Stromversorgung</div>
+              <div class="node__actions--options__item" v-if="getLastTraceTimestamp(node.id)"
+                @click.stop="selectDetails('Traceroutes')">🔭 Traceroutes</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="nodes__list nodes__list--compact" v-show="settingsStore.viewMode === 'compact'">
+      <div class="node node__compact" v-for="node in filteredAndSortedNodes" :key="node.id"
+        v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)"
+        @click.stop="selectDetails('Wähle eine verfügbare Info')">
+        <div v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
+          :class="['node__online node__online--compact', getNodeStatus(node)]">
+        </div>
+        <div class="node__info--block node__info--block__compact">
+          <p>{{ node.longName }}</p>
+          <p class="bold">{{ node.shortName }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="details" v-if="selectedDetails">
+      <div class="details__actions" v-for="node in meshDataStore.data[selectedMasterNode].knownNodes"
+        v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)">
+        <div class="details__actions--item" :class="selectedDetails === 'Online' && 'details__actions--item__selected'"
+          v-if="node.online.length > 1" @click.stop="selectDetails('Online')">⏳ Online</div>
+        <div class="details__actions--item"
+          :class="selectedDetails === 'Batteriestand' && 'details__actions--item__selected'"
+          v-if="node.power.batteryLevel.length > 1 || node.power.voltage.length > 1"
+          @click.stop="selectDetails('Stromversorgung')">⚡️ Stromversorgung</div>
+        <div class="details__actions--item"
+          :class="selectedDetails === 'Traceroutes' && 'details__actions--item__selected'"
+          v-if="getLastTraceTimestamp(node.id)" @click.stop="selectDetails('Traceroutes')">🔭 Traceroutes</div>
+      </div>
+      <p class="details__headline">{{ selectedDetails }}</p>
+      <div class="close close__larger" @click.stop="close"></div>
+      <div class="traceroutes-container" v-if="selectedTraceRoute && selectedDetails === 'Traceroutes'">
+        <div v-for="(tr, index) in selectedTraceRoute" :key="index" class="traceroutes">
+          <p class="traceroutes__time">{{ getTraceTimestamp(tr.timeStamp) }} - Tracroute mit {{ tr.hops }} {{
+            tr.hops
+            === 1 ? 'Hop' : 'Hops' }} {{ tr.hops === 0 ? '(direkt)' : '' }}</p>
+          <div class="traceroutes__row">
+            <p class="traceroutes__row--key">Route Hinweg:</p>
+            <p class="traceroutes__row--value">{{ formatRoute(tr.nodeTraceTo) }}</p>
+          </div>
+          <div class="traceroutes__row">
+            <p class="traceroutes__row--key">Route Rückweg:</p>
+            <p class="traceroutes__row--value">{{ formatRoute(tr.nodeTraceFrom) }}</p>
+          </div>
+        </div>
+      </div>
+      <div v-if="selectedDetails === 'Stromversorgung'" class="graphs">
+        <div class="graph" v-if="processedData.length > 0">
+          <p class="graph__headline">Akku</p>
+          <svg v-if="processedData.length" :viewBox="`0 0 ${graphWidth} ${graphHeight}`"
+            preserveAspectRatio="xMidYMid meet" width="100%" height="auto">
+            <g v-for="(level, index) in yAxisLabels" :key="'y-' + index">
+              <line x1="40" :y1="level.y" :x2="graphWidth - 10" :y2="level.y" stroke="rgb(40,40,40)" stroke-width="1" />
+              <text :x="30" :y="level.y + 4" text-anchor="end" font-size="12" fill="#fff">
+                {{ level.label }}
+              </text>
+            </g>
+            <g v-for="(time, index) in xAxisLabels" :key="'x-' + index">
+              <line :x1="time.x" y1="10" :x2="time.x" :y2="graphHeight - 30" stroke="rgb(40,40,40)" stroke-width="1" />
+              <text :x="time.x" :y="graphHeight - 28" text-anchor="middle" font-size="12" fill="#fff">
+                {{ time.date }}
+              </text>
+              <text :x="time.x" :y="graphHeight - 15" text-anchor="middle" font-size="14" fill="#fff">
+                {{ time.label }}
+              </text>
+            </g>
+            <template v-for="(seg, index) in batterySegments" :key="'seg-' + index">
+              <line :x1="seg.x1" :y1="seg.y1" :x2="seg.x2" :y2="seg.y2" :stroke="seg.color" stroke-width="2" />
+            </template>
+            <circle v-for="(point, index) in processedData" :key="'point-' + index" :cx="point.x" :cy="point.y" r="4"
+              :fill="getBatteryColor(point.level)" @mouseenter="showBatteryTooltip(point)"
+              @mouseleave="hideBatteryTooltip" @touchstart="showBatteryTooltip(point)" @touchend="hideBatteryTooltip" />
+            <text v-if="hoveredBatteryPoint" :x="hoveredBatteryPoint.x + 10" :y="hoveredBatteryPoint.y - 10"
+              font-size="12" fill="#fff" style="pointer-events: none;">
+              {{ hoveredBatteryPoint.level }}%
+            </text>
+          </svg>
+        </div>
+        <div class="graph" v-if="processedVoltageData.length">
+          <p class="graph__headline">Spannung</p>
+          <svg v-if="processedVoltageData.length" :viewBox="`0 0 ${graphWidth} ${graphHeight}`"
+            preserveAspectRatio="xMidYMid meet" width="100%" height="auto">
+            <g v-for="(level, index) in yAxisLabelsVoltage" :key="'vy-' + index">
+              <line x1="40" :y1="level.y" :x2="graphWidth - 10" :y2="level.y" stroke="rgb(40,40,40)" stroke-width="1" />
+              <text :x="30" :y="level.y + 4" text-anchor="end" font-size="12" fill="#fff">
+                {{ level.label }}
+              </text>
+            </g>
+            <g v-for="(time, index) in xAxisLabelsVoltage" :key="'vx-' + index">
+              <line :x1="time.x" y1="10" :x2="time.x" :y2="graphHeight - 30" stroke="rgb(40,40,40)" stroke-width="1" />
+              <text :x="time.x" :y="graphHeight - 28" text-anchor="middle" font-size="12" fill="#fff">
+                {{ time.date }}
+              </text>
+              <text :x="time.x" :y="graphHeight - 15" text-anchor="middle" font-size="14" fill="#fff">
+                {{ time.label }}
+              </text>
+            </g>
+            <template v-for="(seg, index) in voltageSegments" :key="'vseg-' + index">
+              <line :x1="seg.x1" :y1="seg.y1" :x2="seg.x2" :y2="seg.y2" stroke="#fff" stroke-width="2" />
+            </template>
+            <circle v-for="(point, idx) in processedVoltageData" :key="'volt-' + idx" :cx="point.x" :cy="point.y" r="4"
+              :fill="getVoltageColor()" @mouseenter="showVoltageTooltip(point)" @mouseleave="hideVoltageTooltip"
+              @touchstart="showVoltageTooltip(point)" @touchend="hideVoltageTooltip" />
+            <!-- <text v-if="hoveredVoltagePoint" :x="hoveredVoltagePoint.x + 10" :y="hoveredVoltagePoint.y - 10"
+              font-size="14" fill="#fff" style="pointer-events: none;">
+              {{ hoveredVoltagePoint.level }} V
+            </text> -->
+          </svg>
+        </div>
+      </div>
+      <div v-if="selectedDetails === 'Online'">
+        <div class="online-state">
+          <div class="online-state__left">
+            <div class="days">
+              <p class="days__item" v-for="day in getOnlineHistory(selectedNode).days"> {{ day }}</p>
+            </div>
+          </div>
+          <div class="online-state__right">
+            <div class="hours">
+              <p class="hours__item">0</p>
+              <p class="hours__item">1</p>
+              <p class="hours__item">2</p>
+              <p class="hours__item">3</p>
+              <p class="hours__item">4</p>
+              <p class="hours__item">5</p>
+              <p class="hours__item">6</p>
+              <p class="hours__item">7</p>
+              <p class="hours__item">8</p>
+              <p class="hours__item">9</p>
+              <p class="hours__item">10</p>
+              <p class="hours__item">11</p>
+              <p class="hours__item">12</p>
+              <p class="hours__item">13</p>
+              <p class="hours__item">14</p>
+              <p class="hours__item">15</p>
+              <p class="hours__item">16</p>
+              <p class="hours__item">17</p>
+              <p class="hours__item">18</p>
+              <p class="hours__item">19</p>
+              <p class="hours__item">20</p>
+              <p class="hours__item">21</p>
+              <p class="hours__item">22</p>
+              <p class="hours__item">23</p>
+            </div>
+            <div class="fields">
+              <div class="fields__row" v-for="day in getOnlineHistory(selectedNode).times">
+                <div class="fields__row--item" v-for="h in day" :class="[h && 'state-online']"></div>
               </div>
             </div>
           </div>
         </div>
       </div>
-      <div class="nodes__list nodes__list--compact" v-show="settingsStore.viewMode === 'compact'">
-        <div class="node node__compact" v-for="node in filteredAndSortedNodes" :key="node.id"
-          v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)"
-          @click.stop="selectDetails('Wähle eine verfügbare Info')">
-          <div v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
-            :class="['node__online node__online--compact', getNodeStatus(node)]">
-          </div>
-          <div class="node__info--block node__info--block__compact">
-            <p>{{ node.longName }}</p>
-            <p class="bold">{{ node.shortName }}</p>
+    </div>
+    <div class="filter-overlay" v-if="showFilterOverlay">
+      <div class="filter-overlay__head">
+        <h2>{{ isEditing ? 'Filter bearbeiten' : 'Filter erstellen' }}</h2>
+        <div class="close filter-overlay__close" @click.stop="closeOverlay"></div>
+      </div>
+      <div class="master-nodes margin-12" v-if="enableMasters">
+        <div class="master-nodes__container">
+          <div class="master-nodes__option" v-for="masterNode in filteredMasters" :key="masterNode"
+            :class="(selectedMasterNode == masterNode && meshDataStore.nodesIndex.length > 1) && 'master-nodes__selected'"
+            @click="selectMasterNode(masterNode)">
+            <p class="master-nodes__option--label">
+              {{ masterNode }} ({{ meshDataStore.data[masterNode]?.knownNodes?.[0]?.shortName || '----' }})
+            </p>
           </div>
         </div>
       </div>
-      <div class="details" v-if="selectedDetails">
-        <div class="details__actions" v-for="node in meshDataStore.data[selectedMasterNode].knownNodes"
-          v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)">
-          <div class="details__actions--item"
-            :class="selectedDetails === 'Online' && 'details__actions--item__selected'" v-if="node.online.length > 1"
-            @click.stop="selectDetails('Online')">⏳ Online</div>
-          <div class="details__actions--item"
-            :class="selectedDetails === 'Batteriestand' && 'details__actions--item__selected'"
-            v-if="node.power.batteryLevel.length > 1" @click.stop="selectDetails('Batteriestand')">{{ (node.batteryLevel
-            < 35) ? '🪫' : '🔋' }} Batteriestand</div>
-              <div class="details__actions--item"
-                :class="selectedDetails === 'Traceroutes' && 'details__actions--item__selected'"
-                v-if="getLastTraceTimestamp(node.id)" @click.stop="selectDetails('Traceroutes')">🔭 Traceroutes</div>
-          </div>
-          <p class="details__headline">{{ selectedDetails }}</p>
-          <div class="close close__larger" @click.stop="close"></div>
-          <div class="traceroutes-container" v-if="selectedTraceRoute && selectedDetails === 'Traceroutes'">
-            <div v-for="(tr, index) in selectedTraceRoute" :key="index" class="traceroutes">
-              <p class="traceroutes__time">{{ getTraceTimestamp(tr.timeStamp) }} - Tracroute mit {{ tr.hops }} {{
-                tr.hops
-                === 1 ? 'Hop' : 'Hops' }} {{ tr.hops === 0 ? '(direkt)' : '' }}</p>
-              <div class="traceroutes__row">
-                <p class="traceroutes__row--key">Route Hinweg:</p>
-                <p class="traceroutes__row--value">{{ formatRoute(tr.nodeTraceTo) }}</p>
-              </div>
-              <div class="traceroutes__row">
-                <p class="traceroutes__row--key">Route Rückweg:</p>
-                <p class="traceroutes__row--value">{{ formatRoute(tr.nodeTraceFrom) }}</p>
-              </div>
-            </div>
-          </div>
-          <div v-if="selectedDetails === 'Batteriestand'">
-            <div class="graph">
-              <svg v-if="processedData.length > 0" :viewBox="`0 0 ${graphWidth} ${graphHeight}`"
-                preserveAspectRatio="xMidYMid meet" width="100%" height="auto">
-                <g v-for="(level, index) in yAxisLabels" :key="'y-' + index">
-                  <line x1="40" :y1="level.y" :x2="graphWidth - 10" :y2="level.y" stroke="rgb(40, 40, 40)"
-                    stroke-width="1" />
-                  <text :x="30" :y="level.y + 4" text-anchor="end" font-size="12" fill="#fff">
-                    {{ level.label }}
-                  </text>
-                </g>
-                <g v-for="(time, index) in xAxisLabels" :key="'x-' + index">
-                  <line :x1="time.x" y1="10" :x2="time.x" :y2="graphHeight - 30" stroke="rgb(40, 40, 40)"
-                    stroke-width="1" />
-                  <text :x="time.x" :y="graphHeight - 28" text-anchor="middle" font-size="12" fill="#fff">
-                    {{ time.date }}
-                  </text>
-                  <text :x="time.x" :y="graphHeight - 15" text-anchor="middle" font-size="14" fill="#fff">
-                    {{ time.label }}
-                  </text>
-                </g>
-                <polyline :points="generatePolylinePoints()" fill="none" stroke="#67ea94" stroke-width="2" />
-                <circle v-for="(point, index) in processedData" :key="'point-' + index" :cx="point.x" :cy="point.y"
-                  r="4" fill="#67ea94" />
-              </svg>
-            </div>
-          </div>
-          <div v-if="selectedDetails === 'Online'">
-            <div class="online-state">
-              <div class="online-state__left">
-                <div class="days">
-                  <p class="days__item" v-for="day in getOnlineHistory(selectedNode).days"> {{ day }}</p>
-                </div>
-              </div>
-              <div class="online-state__right">
-                <div class="hours">
-                  <p class="hours__item">0</p>
-                  <p class="hours__item">1</p>
-                  <p class="hours__item">2</p>
-                  <p class="hours__item">3</p>
-                  <p class="hours__item">4</p>
-                  <p class="hours__item">5</p>
-                  <p class="hours__item">6</p>
-                  <p class="hours__item">7</p>
-                  <p class="hours__item">8</p>
-                  <p class="hours__item">9</p>
-                  <p class="hours__item">10</p>
-                  <p class="hours__item">11</p>
-                  <p class="hours__item">12</p>
-                  <p class="hours__item">13</p>
-                  <p class="hours__item">14</p>
-                  <p class="hours__item">15</p>
-                  <p class="hours__item">16</p>
-                  <p class="hours__item">17</p>
-                  <p class="hours__item">18</p>
-                  <p class="hours__item">19</p>
-                  <p class="hours__item">20</p>
-                  <p class="hours__item">21</p>
-                  <p class="hours__item">22</p>
-                  <p class="hours__item">23</p>
-                </div>
-                <div class="fields">
-                  <div class="fields__row" v-for="day in getOnlineHistory(selectedNode).times">
-                    <div class="fields__row--item" v-for="h in day" :class="[h && 'state-online']"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+      <div class="filter-overlay__actions">
+        <div class="filter-overlay__actions--part">
+          <input class="filter-overlay__actions--part__item" type="text" v-model="tempFilterName"
+            :disabled="isDefaultFilter" />
         </div>
-        <div class="filter-overlay" v-if="showFilterOverlay">
-          <div class="filter-overlay__head">
-            <h2>{{ isEditing ? 'Filter bearbeiten' : 'Filter erstellen' }}</h2>
-            <div class="close filter-overlay__close" @click.stop="closeOverlay"></div>
+        <div class="filter-overlay__actions--part filter-overlay__actions--part__more">
+          <div class="filter-overlay__actions--part__item" :class="overlaySaveClass" @click.stop="saveFilter">
+            Speichern
           </div>
-          <div class="master-nodes margin-12" v-if="enableMasters">
-            <div class="master-nodes__container">
-              <div class="master-nodes__option" v-for="masterNode in filteredMasters" :key="masterNode"
-                :class="(selectedMasterNode == masterNode && meshDataStore.nodesIndex.length > 1) && 'master-nodes__selected'"
-                @click="selectMasterNode(masterNode)">
-                <p class="master-nodes__option--label">
-                  {{ masterNode }} ({{ meshDataStore.data[masterNode]?.knownNodes?.[0]?.shortName || '----' }})
-                </p>
-              </div>
-            </div>
-          </div>
-          <div class="filter-overlay__actions">
-            <div class="filter-overlay__actions--part">
-              <input class="filter-overlay__actions--part__item" type="text" v-model="tempFilterName"
-                :disabled="isDefaultFilter" />
-            </div>
-            <div class="filter-overlay__actions--part filter-overlay__actions--part__more">
-              <div class="filter-overlay__actions--part__item" :class="overlaySaveClass" @click.stop="saveFilter">
-                Speichern
-              </div>
-              <div class="filter-overlay__actions--part__item" v-if="isEditing && !isDefaultFilter"
-                @click.stop="deleteFilter">
-                Löschen
-              </div>
-            </div>
-          </div>
-          <div class="filter-overlay__body">
-            <div class="filter-overlay__body--list">
-              <h3 class="filter-overlay__body--list__label">Angezeigte Nodes ({{ nodesInFilter.length }})</h3>
-              <div class="filter-overlay__body--list__item" v-for="node in nodesInFilter" :key="node.id"
-                @click="removeNodeFromFilter(node)">
-                {{ node.longName }}
-              </div>
-              <p v-if="nodesInFilter.length === 0">Wähle verfügbare Nodes um diese im Filter anzuzeigen.</p>
-            </div>
-            <div class="filter-overlay__body--list">
-              <h3 class="filter-overlay__body--list__label">Verfügbar für Filter ({{ availableNodes.length }})</h3>
-              <div class="filter-overlay__body--list__item" v-for="node in availableNodes" :key="node.id"
-                @click="addNodeToFilter(node)">
-                {{ node.longName }}
-              </div>
-            </div>
+          <div class="filter-overlay__actions--part__item" v-if="isEditing && !isDefaultFilter"
+            @click.stop="deleteFilter">
+            Löschen
           </div>
         </div>
       </div>
-      <div class="footnote" v-if="!selectedDetails && meshDataStore.data[selectedMasterNode]">
-        <p>meshinfo (frontend) version: 2024-12-29</p>
-        <p>entwickelt mit ❤️ und 🍷 von <a href="http://github.com/jhodevstuff">joshua hoffmann</a></p>
+      <div class="filter-overlay__body">
+        <div class="filter-overlay__body--list">
+          <h3 class="filter-overlay__body--list__label">Angezeigte Nodes ({{ nodesInFilter.length }})</h3>
+          <div class="filter-overlay__body--list__item" v-for="node in nodesInFilter" :key="node.id"
+            @click="removeNodeFromFilter(node)">
+            {{ node.longName }}
+          </div>
+          <p v-if="nodesInFilter.length === 0">Wähle verfügbare Nodes um diese im Filter anzuzeigen.</p>
+        </div>
+        <div class="filter-overlay__body--list">
+          <h3 class="filter-overlay__body--list__label">Verfügbar für Filter ({{ availableNodes.length }})</h3>
+          <div class="filter-overlay__body--list__item" v-for="node in availableNodes" :key="node.id"
+            @click="addNodeToFilter(node)">
+            {{ node.longName }}
+          </div>
+        </div>
       </div>
+    </div>
+  </div>
+  <div class="footnote" v-if="!selectedDetails && meshDataStore.data[selectedMasterNode]">
+    <p>meshinfo (frontend) version: 2024-12-29</p>
+    <p>entwickelt mit ❤️ und 🍷 von <a href="http://github.com/jhodevstuff">joshua hoffmann</a></p>
+  </div>
 </template>
 
 <script setup>
@@ -329,6 +365,11 @@ const isDefaultFilterFn = (filter) => {
 }
 const cutOffMasterNodeDays = 1
 const cutoffMasterNode = Date.now() - cutOffMasterNodeDays * 24 * 60 * 60 * 1000
+
+const hoveredBatteryPoint = ref(null);
+const hoveredVoltagePoint = ref(null);
+let hideBatteryTimer = null;
+let hideVoltageTimer = null;
 
 const modelShortNames = {
   TRACKER_T1000_E: 'T1000E',
@@ -497,6 +538,94 @@ const sortedNodes = computed(() => {
   return arr
 })
 
+const showVoltageTooltip = (point) => {
+  hoveredVoltagePoint.value = point
+  clearTimeout(hideVoltageTimer)
+  hideVoltageTimer = setTimeout(() => {
+    hoveredVoltagePoint.value = null
+  }, 3000)
+}
+
+const hideVoltageTooltip = () => {
+  hoveredVoltagePoint.value = null
+  clearTimeout(hideVoltageTimer)
+}
+
+const getVoltageColor = () => '#fff'
+
+const voltageSegments = computed(() => {
+  const data = processedVoltageData.value
+  const segs = []
+  for (let i = 0; i < data.length - 1; i++) {
+    const p1 = data[i]
+    const p2 = data[i + 1]
+    segs.push({
+      x1: p1.x,
+      y1: p1.y,
+      x2: p2.x,
+      y2: p2.y
+    })
+  }
+  return segs
+})
+
+const getVoltageHistory = (nodeId) => {
+  const node = meshDataStore.data[selectedMasterNode.value].knownNodes.find(n => n.id === nodeId)
+  return node?.power?.voltage || []
+}
+
+const processedVoltageData = computed(() => {
+  const data = getVoltageHistory(selectedNode.value)
+  if (!data.length) return []
+  const minValue = 0
+  const maxValue = 5
+  const timeRange = [
+    Math.min(...data.map(e => e.timestamp)),
+    Math.max(...data.map(e => e.timestamp))
+  ]
+  return data.map(entry => {
+    const x = padding.left
+      + ((entry.timestamp - timeRange[0]) / (timeRange[1] - timeRange[0]))
+      * (graphWidth - padding.left - padding.right)
+    const y = graphHeight - padding.bottom
+      - ((entry.state - minValue) / (maxValue - minValue))
+      * (graphHeight - padding.top - padding.bottom)
+    return { x, y }
+  })
+})
+
+const yAxisLabelsVoltage = computed(() => {
+  const steps = [0, 1, 2, 3, 4, 5]
+  return steps.map(step => ({
+    label: `${step}V`,
+    y: graphHeight - padding.bottom
+      - ((step - 0) / (5 - 0))
+      * (graphHeight - padding.top - padding.bottom)
+  }))
+})
+
+const xAxisLabelsVoltage = computed(() => {
+  const data = getVoltageHistory(selectedNode.value)
+  if (!data.length) return []
+  const timeRange = [
+    Math.min(...data.map(e => e.timestamp)),
+    Math.max(...data.map(e => e.timestamp))
+  ]
+  const step = (timeRange[1] - timeRange[0]) / 4
+  const labels = []
+  for (let i = 0; i <= 4; i++) {
+    const timestamp = timeRange[0] + i * step
+    labels.push({
+      date: formatDayMonth(timestamp),
+      label: formatTimeOnly(timestamp),
+      x: padding.left
+        + ((timestamp - timeRange[0]) / (timeRange[1] - timeRange[0]))
+        * (graphWidth - padding.left - padding.right)
+    })
+  }
+  return labels
+})
+
 const graphWidth = 600
 const graphHeight = 300
 const padding = { top: 10, bottom: 30, left: 40, right: 18 }
@@ -514,8 +643,8 @@ const processedData = computed(() => {
   const minValue = 0
   const maxValue = 100
   const timeRange = [
-    Math.min(...data.map(entry => entry.timestamp)),
-    Math.max(...data.map(entry => entry.timestamp))
+    Math.min(...data.map(e => e.timestamp)),
+    Math.max(...data.map(e => e.timestamp))
   ]
   return data.map(entry => {
     const x = padding.left
@@ -524,8 +653,48 @@ const processedData = computed(() => {
     const y = graphHeight - padding.bottom
       - ((entry.state - minValue) / (maxValue - minValue))
       * (graphHeight - padding.top - padding.bottom)
-    return { x, y }
+    return {
+      x,
+      y,
+      level: entry.state
+    }
   })
+})
+
+const showBatteryTooltip = (point) => {
+  hoveredBatteryPoint.value = point
+  clearTimeout(hideBatteryTimer)
+  hideBatteryTimer = setTimeout(() => {
+    hoveredBatteryPoint.value = null
+  }, 3000)
+}
+
+const hideBatteryTooltip = () => {
+  hoveredBatteryPoint.value = null
+  clearTimeout(hideBatteryTimer)
+}
+
+const getBatteryColor = (level) => {
+  const hue = 120 * (level / 100)
+  return `hsl(${hue}, 100%, 50%)`
+}
+
+const batterySegments = computed(() => {
+  const data = processedData.value
+  const segs = []
+  for (let i = 0; i < data.length - 1; i++) {
+    const p1 = data[i]
+    const p2 = data[i + 1]
+    const avgLevel = (p1.level + p2.level) / 2
+    segs.push({
+      x1: p1.x,
+      y1: p1.y,
+      x2: p2.x,
+      y2: p2.y,
+      color: getBatteryColor(avgLevel)
+    })
+  }
+  return segs
 })
 
 const yAxisLabels = computed(() => {
@@ -558,10 +727,6 @@ const xAxisLabels = computed(() => {
   }
   return labels
 })
-
-const generatePolylinePoints = () => {
-  return processedData.value.map(point => `${point.x},${point.y}`).join(' ')
-}
 
 const formatTimeOnly = (timestamp) => {
   const date = new Date(timestamp)
@@ -1166,8 +1331,19 @@ onUnmounted(() => clearInterval(intervalId))
   }
 }
 
+.graphs {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
 .graph {
   max-width: 820px;
+
+  &__headline {
+    font-size: 22px;
+    margin-bottom: 10px;
+  }
 }
 
 .online-state {
