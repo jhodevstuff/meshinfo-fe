@@ -304,8 +304,8 @@
       </div>
     </div>
   </div>
-  <div class="footnote" v-if="!selectedDetails && meshDataStore.data[selectedMasterNode]">
-    <p>meshinfo (frontend) version: 2024-12-29</p>
+  <div class="footnote" v-if="!selectedDetails && meshDataStore.data[selectedMasterNode] && !showFilterOverlay">
+    <p>meshinfo (frontend) version: 2024-01-11</p>
     <p>entwickelt mit ❤️ und 🍷 von <a href="http://github.com/jhodevstuff">joshua hoffmann</a></p>
   </div>
 </template>
@@ -348,7 +348,10 @@ const enableMasters = ref(false)
 const nodeImages = ref([
   'HELTEC_V3', 'TBEAM', 'T_ECHO',
   'T_DECK', 'TRACKER_T1000_E',
-  'RAK4631', 'HELTEC_MESH_NODE_T114'
+  'RAK4631', 'HELTEC_MESH_NODE_T114',
+  'HELTEC_V2_1', 'SEEED_XIAO_S3',
+  'NRF52_PROMICRO_DIY', 'HELTEC_WIRELESS_TRACKER',
+  'RPI_PICO'
 ])
 const originalViewMode = ref(null)
 const userFilters = ref([])
@@ -363,8 +366,8 @@ const isDefaultFilterFn = (filter) => {
   const idx = userFilters.value.findIndex(f => f.id === filter.id)
   return idx === 0
 }
-const cutOffMasterNodeDays = 1
-const cutoffMasterNode = Date.now() - cutOffMasterNodeDays * 24 * 60 * 60 * 1000
+const cutOffMasterNodeHours = 1;
+const cutoffMasterNode = Date.now() - cutOffMasterNodeHours * 60 * 60 * 1000;
 
 const hoveredBatteryPoint = ref(null);
 const hoveredVoltagePoint = ref(null);
@@ -373,6 +376,7 @@ let hideVoltageTimer = null;
 
 const modelShortNames = {
   TRACKER_T1000_E: 'T1000E',
+  HELTEC_V2_1: 'Heltec V2.1',
   HELTEC_V3: 'Heltec V3',
   TBEAM: 'T-Beam',
   T_ECHO: 'T-Echo',
@@ -381,7 +385,11 @@ const modelShortNames = {
   HELTEC_MESH_NODE_T114: 'Heltec T114',
   HELTEC_WIRELESS_TRACKER: 'Heltec Wireless Tracker',
   RPI_PICO: 'RPi Pico',
-  UNSET: '?'
+  NRF52_PROMICRO_DIY: 'NRF52 DIY',
+  SEEED_XIAO_S3: 'XIAO S3',
+  STATION_G2: 'Station G2',
+  UNSET: '?',
+  '69': 'UPDATE CLI!'
 }
 
 const tryOpenFilterOverlay = (filter) => {
