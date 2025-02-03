@@ -92,8 +92,8 @@
             <p class="node__actions--headline">Verfügbare Details</p>
             <div class="node__actions--options">
               <div class="node__actions--options__item" v-if="node.online.length > 1"
-                @click.stop="selectDetails('Online')">
-                ⏳ Online</div>
+                @click.stop="selectDetails('Gesehen')">
+                ⏳ Gesehen</div>
               <div class="node__actions--options__item"
                 v-if="node.power.batteryLevel.length > 1 || node.power.voltage.length > 1"
                 @click.stop="selectDetails('Stromversorgung')">⚡️ Stromversorgung</div>
@@ -120,8 +120,8 @@
     <div class="details" v-if="selectedDetails">
       <div class="details__actions" v-for="node in meshDataStore.data[selectedMasterNode].knownNodes"
         v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)">
-        <div class="details__actions--item" :class="selectedDetails === 'Online' && 'details__actions--item__selected'"
-          v-if="node.online.length > 1" @click.stop="selectDetails('Online')">⏳ Online</div>
+        <div class="details__actions--item" :class="selectedDetails === 'Gesehen' && 'details__actions--item__selected'"
+          v-if="node.online.length > 1" @click.stop="selectDetails('Gesehen')">⏳ Gesehen</div>
         <div class="details__actions--item"
           :class="selectedDetails === 'Stromversorgung' && 'details__actions--item__selected'"
           v-if="node.power.batteryLevel.length > 1 || node.power.voltage.length > 1"
@@ -211,7 +211,7 @@
           </svg>
         </div>
       </div>
-      <div v-if="selectedDetails === 'Online'">
+      <div v-if="selectedDetails === 'Gesehen'">
         <div class="online-state">
           <div class="online-state__left">
             <div class="days">
@@ -305,7 +305,7 @@
     </div>
   </div>
   <div class="footnote" v-if="!selectedDetails && meshDataStore.data[selectedMasterNode] && !showFilterOverlay">
-    <p>meshinfo (frontend) version: 2024-01-11</p>
+    <p>meshinfo (frontend) version: 2024-02-03</p>
     <p>entwickelt mit ❤️ und 🍷 von <a href="http://github.com/jhodevstuff">joshua hoffmann</a></p>
   </div>
 </template>
@@ -366,7 +366,7 @@ const isDefaultFilterFn = (filter) => {
   const idx = userFilters.value.findIndex(f => f.id === filter.id)
   return idx === 0
 }
-const cutOffMasterNodeHours = 2;
+const cutOffMasterNodeHours = 1;
 const cutoffMasterNode = Date.now() - cutOffMasterNodeHours * 60 * 60 * 1000;
 
 const hoveredBatteryPoint = ref(null);
@@ -749,7 +749,6 @@ const filteredMasters = computed(() => {
     meshDataStore.data[masterNodeId]?.knownNodes?.forEach((knownNode) => {
       if (knownNode?.id === meshDataStore.data[masterNodeId]?.info.infoFrom) {
         masterNode = knownNode;
-        console.log(masterNode)
       }
     })
     if (!masterNode || masterNode.lastHeard === undefined) return false;

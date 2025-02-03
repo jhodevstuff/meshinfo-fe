@@ -18,8 +18,9 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow
 })
 
-const MAX_AGE_HOURS = 48
-const MIN_OPACITY = 0.02
+const MAX_AGE_HOURS = 36
+// const MIN_OPACITY = 0.02
+const MIN_OPACITY = 0
 const mapEl = ref(null)
 let map = null
 const meshDataStore = useMeshDataStore()
@@ -31,7 +32,7 @@ const formatTimestamp = (ts) => {
   const mm = String(d.getMinutes()).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   const month = String(d.getMonth() + 1).padStart(2, '0')
-  return `${hh}:${mm} ${day}.${month}.`
+  return `${hh}:${mm} - ${day}.${month}.`
 }
 
 const formatNodePopup = (node) => `
@@ -47,8 +48,13 @@ const getLineStyle = (deltaHours) => {
   if (deltaHours > MAX_AGE_HOURS) return null
   let opacity = 1 - deltaHours / MAX_AGE_HOURS
   if (opacity < MIN_OPACITY) opacity = MIN_OPACITY
-  return { color: '#000', opacity }
+  return { 
+    color: '#fff', 
+    opacity,
+    weight: 5
+  }
 }
+
 
 const createPairs = (arr) => {
   const pairs = []
@@ -105,11 +111,18 @@ onMounted(async () => {
   await nextTick()
   const [initialLat, initialLon] = computeCenterIgnoringOutliers(mergedNodes.value)
   map = L.map(mapEl.value).setView([initialLat, initialLon], 13)
+  // L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  //   attribution: '&copy; <a href="https://www.esri.com/de-DE/arcgis/products/arcgis-online">ESRI</a>'
+  // }).addTo(map)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap'
   }).addTo(map)
+  map.eachLayer(layer => {
+    if (layer instanceof L.TileLayer) {
+      layer.getContainer().style.filter = 'contrast(120%) brightness(85%) grayscale(70%) invert(100%) hue-rotate(180deg)';
+    }
+  })
   map.invalidateSize()
-
   mergedNodes.value.forEach(node => {
     L.marker([node.lat, node.lon])
       .addTo(map)
@@ -121,7 +134,6 @@ onMounted(async () => {
       .openTooltip()
       .bindPopup(formatNodePopup(node))
   })
-
   traceroutes.value.forEach(tr => {
     tr.traces?.forEach(route => {
       const rawTs = route.timeStamp || tr.timeStamp
@@ -186,10 +198,13 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 #map {
+  position: relative;
   width: 100%;
   height: calc(100vh - 60px);
   margin-top: 60px;
+  background: #000;
 }
+
 </style>
