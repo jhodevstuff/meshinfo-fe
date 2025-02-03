@@ -366,7 +366,7 @@ const isDefaultFilterFn = (filter) => {
   const idx = userFilters.value.findIndex(f => f.id === filter.id)
   return idx === 0
 }
-const cutOffMasterNodeHours = 1;
+const cutOffMasterNodeHours = 2;
 const cutoffMasterNode = Date.now() - cutOffMasterNodeHours * 60 * 60 * 1000;
 
 const hoveredBatteryPoint = ref(null);
@@ -745,9 +745,15 @@ const formatTimeOnly = (timestamp) => {
 
 const filteredMasters = computed(() => {
   return meshDataStore.nodesIndex.filter(masterNodeId => {
-    const masterNode = meshDataStore.data[masterNodeId]?.knownNodes?.[0]
-    if (!masterNode || masterNode.lastHeard === undefined) return false
-    return masterNode.lastHeard >= cutoffMasterNode
+    let masterNode = null;
+    meshDataStore.data[masterNodeId]?.knownNodes?.forEach((knownNode) => {
+      if (knownNode?.id === meshDataStore.data[masterNodeId]?.info.infoFrom) {
+        masterNode = knownNode;
+        console.log(masterNode)
+      }
+    })
+    if (!masterNode || masterNode.lastHeard === undefined) return false;
+    return masterNode.lastHeard >= cutoffMasterNode;
   })
 })
 
