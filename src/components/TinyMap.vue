@@ -66,5 +66,6 @@ watch(() => props.node, (newVal) => {
   height: 400px;
   cursor: pointer;
   border-radius: 12px;
+  margin-bottom: 64px;
 }
 </style>
