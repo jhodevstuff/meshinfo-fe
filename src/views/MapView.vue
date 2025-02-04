@@ -2,27 +2,26 @@
   <div id="map" ref="mapEl"></div>
   <div class="map-options">
     <div class="map-select">
-      <div class="map-select__option map-select__option--left" :class="settingsStore.mapMode === 'defaultMap' && 'map-select__option--selected'" @click="selectSatMap(false)">Standart</div>
-      <div class="map-select__option map-select__option--right" :class="settingsStore.mapMode === 'satMap' && 'map-select__option--selected'" @click="selectSatMap(true)">Satellit</div>
+      <div class="map-select__option map-select__option--left"
+        :class="settingsStore.mapMode === 'defaultMap' && 'map-select__option--selected'" @click="selectSatMap(false)">
+        Standart</div>
+      <div class="map-select__option map-select__option--right"
+        :class="settingsStore.mapMode === 'satMap' && 'map-select__option--selected'" @click="selectSatMap(true)">
+        Satellit</div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, nextTick, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useMeshDataStore } from '@/stores/meshDataStore'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import markerIcon from '@/assets/map/marker-icon.png'
 import markerIcon2x from '@/assets/map/marker-icon-2x.png'
 import markerShadow from '@/assets/map/marker-shadow.png'
-import { useMeshDataStore } from '@/stores/meshDataStore'
-
-const settingsStore = useSettingsStore()
-
-const selectSatMap = (wantsSatMap) => {
-  settingsStore.setMapMode(wantsSatMap ? 'satMap' : 'defaultMap')
-}
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -31,11 +30,28 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow
 })
 
-const MAX_AGE_HOURS = 36
-const MIN_OPACITY = 0
 const mapEl = ref(null)
 let map = null
+const settingsStore = useSettingsStore()
 const meshDataStore = useMeshDataStore()
+const route = useRoute()
+
+const computeCenterIgnoringOutliers = (nodes) => {
+  if (!nodes.length) return [48.132689, 11.549763]
+  const latArr = nodes.map(n => n.lat)
+  const lonArr = nodes.map(n => n.lon)
+  const median = (values) => {
+    if (!values.length) return 0
+    const arr = [...values].sort((a, b) => a - b)
+    const mid = Math.floor(arr.length / 2)
+    return arr.length % 2 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2
+  }
+  return [median(latArr), median(lonArr)]
+}
+
+const selectSatMap = (wantsSatMap) => {
+  settingsStore.setMapMode(wantsSatMap ? 'satMap' : 'defaultMap')
+}
 
 const formatTimestamp = (ts) => {
   const d = new Date(ts)
@@ -57,14 +73,10 @@ const formatNodePopup = (node) => `
 `
 
 const getLineStyle = (deltaHours) => {
-  if (deltaHours > MAX_AGE_HOURS) return null
-  let opacity = 1 - deltaHours / MAX_AGE_HOURS
-  if (opacity < MIN_OPACITY) opacity = MIN_OPACITY
-  return { 
-    color: '#fff', 
-    opacity,
-    weight: 5
-  }
+  if (deltaHours > 36) return null
+  let opacity = 1 - deltaHours / 36
+  if (opacity < 0) opacity = 0
+  return { color: '#fff', opacity, weight: 5 }
 }
 
 const createPairs = (arr) => {
@@ -73,20 +85,6 @@ const createPairs = (arr) => {
     pairs.push([arr[i], arr[i + 1]])
   }
   return pairs
-}
-
-const median = (values) => {
-  if (!values.length) return 0
-  const arr = [...values].sort((a, b) => a - b)
-  const mid = Math.floor(arr.length / 2)
-  return arr.length % 2 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2
-}
-
-const computeCenterIgnoringOutliers = (nodes) => {
-  if (!nodes.length) return [48.132689, 11.549763]
-  const latArr = nodes.map(n => n.lat)
-  const lonArr = nodes.map(n => n.lon)
-  return [median(latArr), median(lonArr)]
 }
 
 const mergedNodes = computed(() => {
@@ -120,39 +118,36 @@ const traceroutes = computed(() => {
 
 onMounted(async () => {
   await nextTick()
-  const [initialLat, initialLon] = computeCenterIgnoringOutliers(mergedNodes.value)
-  map = L.map(mapEl.value).setView([initialLat, initialLon], 13)
-  let currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap'
-  }).addTo(map)
-  const updateMapLayer = () => {
-    map.eachLayer(layer => {
-      if (layer instanceof L.TileLayer) {
-        map.removeLayer(layer)
-      }
+  let lat, lon, zoom
+  if (route.query.focusNodeId && route.query.lat && route.query.lon) {
+    lat = parseFloat(route.query.lat)
+    lon = parseFloat(route.query.lon)
+    zoom = route.query.zoom ? parseInt(route.query.zoom) : 16
+  } else {
+    [lat, lon] = computeCenterIgnoringOutliers(mergedNodes.value)
+    zoom = 13
+  }
+  map = L.map(mapEl.value).setView([lat, lon], zoom)
+  let currentTileLayer = null
+  if (settingsStore.mapMode === 'satMap') {
+    currentTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '&copy; <a href="https://www.esri.com/de-DE/arcgis/products/arcgis-online">ESRI</a>'
     })
-    if (settingsStore.mapMode === 'satMap') {
-      currentTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: '&copy; <a href="https://www.esri.com/de-DE/arcgis/products/arcgis-online">ESRI</a>'
-      })
-    } else {
-      currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap'
-      })
-    }
-    currentTileLayer.addTo(map)
-    map.eachLayer(layer => {
-      if (layer instanceof L.TileLayer) {
-        if (settingsStore.mapMode === 'satMap') {
-          layer.getContainer().style.filter = 'contrast(95%) brightness(95%) grayscale(25%)';
-        } else {
-          layer.getContainer().style.filter = 'contrast(120%) brightness(85%) grayscale(70%) invert(100%) hue-rotate(180deg)';
-        }
-      }
+  } else {
+    currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap'
     })
   }
-  updateMapLayer()
-  watch(() => settingsStore.mapMode, updateMapLayer)
+  currentTileLayer.addTo(map)
+  map.eachLayer(layer => {
+    if (layer instanceof L.TileLayer) {
+      if (settingsStore.mapMode === 'satMap') {
+        layer.getContainer().style.filter = 'contrast(95%) brightness(95%) grayscale(25%)'
+      } else {
+        layer.getContainer().style.filter = 'contrast(120%) brightness(85%) grayscale(70%) invert(100%) hue-rotate(180deg)'
+      }
+    }
+  })
   map.invalidateSize()
   mergedNodes.value.forEach(node => {
     L.marker([node.lat, node.lon])
@@ -166,8 +161,8 @@ onMounted(async () => {
       .bindPopup(formatNodePopup(node))
   })
   traceroutes.value.forEach(tr => {
-    tr.traces?.forEach(route => {
-      const rawTs = route.timeStamp || tr.timeStamp
+    tr.traces?.forEach(routeData => {
+      const rawTs = routeData.timeStamp || tr.timeStamp
       if (!rawTs) return
       const routeTimeVal = parseInt(rawTs, 10)
       if (isNaN(routeTimeVal)) return
@@ -175,23 +170,22 @@ onMounted(async () => {
       if (deltaHours < 0) return
       const style = getLineStyle(deltaHours)
       if (!style) return
-      const masterToId = route.nodeTraceTo?.[0] || '-'
-      const masterFromArr = route.nodeTraceFrom || []
+      const masterToId = routeData.nodeTraceTo?.[0] || '-'
+      const masterFromArr = routeData.nodeTraceFrom || []
       const masterFromId = masterFromArr.length ? masterFromArr[masterFromArr.length - 1] : '-'
       const masterToNode = mergedNodes.value.find(n => n.id === masterToId)
       const masterFromNode = mergedNodes.value.find(n => n.id === masterFromId)
       const masterToLabel = masterToNode ? `${masterToId} (${masterToNode.shortName || '—'})` : masterToId
       const masterFromLabel = masterFromNode ? `${masterFromId} (${masterFromNode.shortName || '—'})` : masterFromId
-      const toPairs = createPairs(route.nodeTraceTo || [])
+      const toPairs = createPairs(routeData.nodeTraceTo || [])
       toPairs.forEach(pair => {
         const nodeObjs = pair.map(id => mergedNodes.value.find(n => n.id === id)).filter(Boolean)
         if (nodeObjs.length === 2) {
-          const [nodeA, nodeB] = nodeObjs
-          const labelA = nodeA.id + ' (' + nodeA.shortName + ')' || nodeA.id
-          const labelB = nodeB.id + ' (' + nodeB.shortName + ')' || nodeB.id
+          const labelA = nodeObjs[0].id + ' (' + nodeObjs[0].shortName + ')' || nodeObjs[0].id
+          const labelB = nodeObjs[1].id + ' (' + nodeObjs[1].shortName + ')' || nodeObjs[1].id
           const coords = [
-            [nodeA.lat, nodeA.lon],
-            [nodeB.lat, nodeB.lon]
+            [nodeObjs[0].lat, nodeObjs[0].lon],
+            [nodeObjs[1].lat, nodeObjs[1].lon]
           ]
           const popupText = `
             <div>
@@ -203,16 +197,15 @@ onMounted(async () => {
           L.polyline(coords, style).addTo(map).bindPopup(popupText)
         }
       })
-      const fromPairs = createPairs(route.nodeTraceFrom || [])
+      const fromPairs = createPairs(routeData.nodeTraceFrom || [])
       fromPairs.forEach(pair => {
         const nodeObjs = pair.map(id => mergedNodes.value.find(n => n.id === id)).filter(Boolean)
         if (nodeObjs.length === 2) {
-          const [nodeA, nodeB] = nodeObjs
-          const labelA = nodeA.id + ' (' + nodeA.shortName + ')' || nodeA.id
-          const labelB = nodeB.id + ' (' + nodeB.shortName + ')' || nodeB.id
+          const labelA = nodeObjs[0].id + ' (' + nodeObjs[0].shortName + ')' || nodeObjs[0].id
+          const labelB = nodeObjs[1].id + ' (' + nodeObjs[1].shortName + ')' || nodeObjs[1].id
           const coords = [
-            [nodeA.lat, nodeA.lon],
-            [nodeB.lat, nodeB.lon]
+            [nodeObjs[0].lat, nodeObjs[0].lon],
+            [nodeObjs[1].lat, nodeObjs[1].lon]
           ]
           const popupText = `
             <div>
@@ -225,6 +218,37 @@ onMounted(async () => {
         }
       })
     })
+  })
+  if (route.query.focusNodeId && route.query.lat && route.query.lon) {
+    map.flyTo([lat, lon], zoom)
+  }
+})
+
+watch(() => settingsStore.mapMode, () => {
+  map.eachLayer(layer => {
+    if (layer instanceof L.TileLayer) {
+      map.removeLayer(layer)
+    }
+  })
+  let newTileLayer = null
+  if (settingsStore.mapMode === 'satMap') {
+    newTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '&copy; <a href="https://www.esri.com/de-DE/arcgis/products/arcgis-online">ESRI</a>'
+    })
+  } else {
+    newTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap'
+    })
+  }
+  newTileLayer.addTo(map)
+  map.eachLayer(layer => {
+    if (layer instanceof L.TileLayer) {
+      if (settingsStore.mapMode === 'satMap') {
+        layer.getContainer().style.filter = 'contrast(95%) brightness(95%) grayscale(25%)'
+      } else {
+        layer.getContainer().style.filter = 'contrast(120%) brightness(85%) grayscale(70%) invert(100%) hue-rotate(180deg)'
+      }
+    }
   })
 })
 </script>
@@ -243,11 +267,8 @@ onMounted(async () => {
   position: fixed;
   top: 60px;
   width: 100%;
-  padding: 12px;
+  padding: 16px 0;
   z-index: 1;
-  // background: rgba($color: #000000, $alpha: 0.8);
-  // backdrop-filter: blur(4px);
-  //   -webkit-backdrop-filter: blur(4px);
   display: flex;
   justify-content: center;
 }
@@ -259,9 +280,7 @@ onMounted(async () => {
   overflow: hidden;
   background-color: #181818;
   padding: 2px;
-  -webkit-box-shadow: 0px 0px 10px 0px rgba(103,234,148,1);
-  -moz-box-shadow: 0px 0px 10px 0px rgba(103,234,148,1);
-  box-shadow: 0px 0px 10px 0px rgba(103,234,148,1);
+  box-shadow: 0px 0px 10px 0px rgba(103, 234, 148, 1);
 
   &__option {
     background: #67ea94;
@@ -272,7 +291,7 @@ onMounted(async () => {
     border-radius: 100px;
     font-size: 14px;
     line-height: 18px;
-    transition: all 300ms ease-in-out;
+    transition: all 200ms ease-in-out;
 
     &--left {
       border-top-right-radius: 0;
@@ -291,5 +310,4 @@ onMounted(async () => {
     }
   }
 }
-
 </style>

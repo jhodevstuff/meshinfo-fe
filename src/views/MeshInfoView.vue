@@ -37,7 +37,8 @@
       </div>
       <div class="nodes__list" v-show="settingsStore.viewMode === 'normal'">
         <div class="node" v-for="node in filteredAndSortedNodes" :key="node.id"
-          v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)">
+          v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)"
+          @click.stop="selectDetails('Gesehen')">
           <div v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
             :class="['node__online', getNodeStatus(node)]"></div>
           <div class="node__icon">
@@ -99,6 +100,8 @@
                 @click.stop="selectDetails('Stromversorgung')">⚡️ Stromversorgung</div>
               <div class="node__actions--options__item" v-if="getLastTraceTimestamp(node.id)"
                 @click.stop="selectDetails('Traceroutes')">🔭 Traceroutes</div>
+              <div class="node__actions--options__item" v-if="node.lat && node.lon"
+                @click.stop="selectDetails('Position')">🌍 Position</div>
             </div>
           </div>
         </div>
@@ -107,7 +110,7 @@
     <div class="nodes__list nodes__list--compact" v-show="settingsStore.viewMode === 'compact'">
       <div class="node node__compact" v-for="node in filteredAndSortedNodes" :key="node.id"
         v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)"
-        @click.stop="selectDetails('Wähle eine verfügbare Info')">
+        @click.stop="selectDetails('Gesehen')">
         <div v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
           :class="['node__online node__online--compact', getNodeStatus(node)]">
         </div>
@@ -129,6 +132,9 @@
         <div class="details__actions--item"
           :class="selectedDetails === 'Traceroutes' && 'details__actions--item__selected'"
           v-if="getLastTraceTimestamp(node.id)" @click.stop="selectDetails('Traceroutes')">🔭 Traceroutes</div>
+        <div class="details__actions--item"
+          :class="selectedDetails === 'Position' && 'details__actions--item__selected'" v-if="node.lat && node.lon"
+          @click.stop="selectDetails('Position')">🌍 Position</div>
       </div>
       <p class="details__headline">{{ selectedDetails }}</p>
       <div class="close close__larger" @click.stop="close"></div>
@@ -253,6 +259,9 @@
           </div>
         </div>
       </div>
+      <div class="tiny-map" v-if="selectedDetails === 'Position'">
+        <TinyMap :node="getSelectedNode()" @openFullMap="openFullMap" />
+      </div>
     </div>
     <div class="filter-overlay" v-if="showFilterOverlay">
       <div class="filter-overlay__head">
@@ -314,6 +323,9 @@
 import { useMeshDataStore } from '@/stores/meshDataStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
+
+import TinyMap from '@/components/TinyMap.vue'
 
 let pressTimer = null
 const pressDuration = 200
@@ -336,6 +348,7 @@ let intervalId
 const meshDataStore = useMeshDataStore()
 const settingsStore = useSettingsStore()
 const onlineHistoryCache = new Map()
+const router = useRouter()
 
 const elapsedSeconds = ref(0)
 const traceRoutesVisible = ref(false)
@@ -351,7 +364,7 @@ const nodeImages = ref([
   'RAK4631', 'HELTEC_MESH_NODE_T114',
   'HELTEC_V2_1', 'SEEED_XIAO_S3',
   'NRF52_PROMICRO_DIY', 'HELTEC_WIRELESS_TRACKER',
-  'RPI_PICO'
+  'RPI_PICO', 'RAK11310'
 ])
 const originalViewMode = ref(null)
 const userFilters = ref([])
@@ -382,6 +395,7 @@ const modelShortNames = {
   T_ECHO: 'T-Echo',
   T_DECK: 'T-Deck',
   RAK4631: 'RAK4631',
+  RAK11310: 'RAK11310',
   HELTEC_MESH_NODE_T114: 'Heltec T114',
   HELTEC_WIRELESS_TRACKER: 'Heltec Wireless Tracker',
   RPI_PICO: 'RPi Pico',
@@ -390,6 +404,23 @@ const modelShortNames = {
   STATION_G2: 'Station G2',
   UNSET: '?',
   '69': 'UPDATE CLI!'
+}
+
+const getSelectedNode = () => {
+  return meshDataStore.data[selectedMasterNode.value].knownNodes.find(n => n.id === selectedNode.value)
+}
+
+const openFullMap = (node) => {
+  if (!node || !node.lat || !node.lon) return
+  router.push({
+    name: 'map',
+    query: {
+      focusNodeId: node.id,
+      lat: node.lat,
+      lon: node.lon,
+      zoom: 16
+    }
+  })
 }
 
 const tryOpenFilterOverlay = (filter) => {
