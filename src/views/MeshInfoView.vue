@@ -305,7 +305,7 @@
     </div>
   </div>
   <div class="footnote" v-if="!selectedDetails && meshDataStore.data[selectedMasterNode] && !showFilterOverlay">
-    <p>meshinfo (frontend) version: 2024-02-03</p>
+    <p>meshinfo (frontend) version: 2024-02-04</p>
     <p>entwickelt mit ❤️ und 🍷 von <a href="http://github.com/jhodevstuff">joshua hoffmann</a></p>
   </div>
 </template>
