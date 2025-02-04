@@ -4,6 +4,7 @@ export const useSettingsStore = defineStore("settings", {
   state: () => ({
     viewMode: localStorage.getItem("meshinfo-config__view") || "normal",
     sortMode: localStorage.getItem("meshinfo-config__sort") || "lastHeard",
+    mapMode: localStorage.getItem("meshinfo-config__map") || "defaultMap",
     verificationMode: localStorage.getItem("meshinfo-config__verified" || false),
   }),
   actions: {
@@ -20,6 +21,10 @@ export const useSettingsStore = defineStore("settings", {
     setSortMode(mode) {
       this.sortMode = mode;
       localStorage.setItem("meshinfo-config__sort", mode);
+    },
+    setMapMode(mode) {
+      this.mapMode = mode;
+      localStorage.setItem("meshinfo-config__map", mode);
     },
     setVerification(mode) {
       this.verificationMode = mode;

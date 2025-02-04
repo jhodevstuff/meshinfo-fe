@@ -36,6 +36,17 @@
           Zuerst gesehen
         </label>
       </div>
+      <!-- <div class="settings-panel__option">
+        <h1 class="settings-panel__option--title">Map</h1>
+        <label class="settings-panel__option--label">
+          <input type="radio" value="defaultMap" v-model="mapMode" @change="changeMapView" />
+          Standart
+        </label>
+        <label class="settings-panel__option--label">
+          <input type="radio" value="satMap" v-model="mapMode" @change="changeMapView" />
+          Satellitenbild
+        </label>
+      </div> -->
     </div>
   </div>
 </template>
@@ -52,6 +63,7 @@ const settingsVisible = ref(false)
 const settingsStore = useSettingsStore()
 const viewMode = ref(settingsStore.viewMode)
 const sortMode = ref(settingsStore.sortMode)
+const mapMode = ref(settingsStore.mapMode)
 const verificationMode = ref(settingsStore.verificationMode)
 const clicksToVerify = 5;
 
@@ -73,6 +85,11 @@ const toggleSettings = () => {
 
 const updateViewMode = () => {
   settingsStore.setViewMode(viewMode.value)
+  settingsVisible.value = false
+}
+
+const changeMapView = () => {
+  settingsStore.setMapMode(mapMode.value)
   settingsVisible.value = false
 }
 

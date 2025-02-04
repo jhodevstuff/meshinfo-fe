@@ -1,15 +1,28 @@
 <template>
   <div id="map" ref="mapEl"></div>
+  <div class="map-options">
+    <div class="map-select">
+      <div class="map-select__option map-select__option--left" :class="settingsStore.mapMode === 'defaultMap' && 'map-select__option--selected'" @click="selectSatMap(false)">Standart</div>
+      <div class="map-select__option map-select__option--right" :class="settingsStore.mapMode === 'satMap' && 'map-select__option--selected'" @click="selectSatMap(true)">Satellit</div>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, nextTick } from 'vue'
+import { computed, onMounted, ref, nextTick, watch } from 'vue'
+import { useSettingsStore } from '@/stores/settingsStore'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import markerIcon from '@/assets/map/marker-icon.png'
 import markerIcon2x from '@/assets/map/marker-icon-2x.png'
 import markerShadow from '@/assets/map/marker-shadow.png'
 import { useMeshDataStore } from '@/stores/meshDataStore'
+
+const settingsStore = useSettingsStore()
+
+const selectSatMap = (wantsSatMap) => {
+  settingsStore.setMapMode(wantsSatMap ? 'satMap' : 'defaultMap')
+}
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -19,7 +32,6 @@ L.Icon.Default.mergeOptions({
 })
 
 const MAX_AGE_HOURS = 36
-// const MIN_OPACITY = 0.02
 const MIN_OPACITY = 0
 const mapEl = ref(null)
 let map = null
@@ -54,7 +66,6 @@ const getLineStyle = (deltaHours) => {
     weight: 5
   }
 }
-
 
 const createPairs = (arr) => {
   const pairs = []
@@ -111,17 +122,37 @@ onMounted(async () => {
   await nextTick()
   const [initialLat, initialLon] = computeCenterIgnoringOutliers(mergedNodes.value)
   map = L.map(mapEl.value).setView([initialLat, initialLon], 13)
-  // L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-  //   attribution: '&copy; <a href="https://www.esri.com/de-DE/arcgis/products/arcgis-online">ESRI</a>'
-  // }).addTo(map)
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  let currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap'
   }).addTo(map)
-  map.eachLayer(layer => {
-    if (layer instanceof L.TileLayer) {
-      layer.getContainer().style.filter = 'contrast(120%) brightness(85%) grayscale(70%) invert(100%) hue-rotate(180deg)';
+  const updateMapLayer = () => {
+    map.eachLayer(layer => {
+      if (layer instanceof L.TileLayer) {
+        map.removeLayer(layer)
+      }
+    })
+    if (settingsStore.mapMode === 'satMap') {
+      currentTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '&copy; <a href="https://www.esri.com/de-DE/arcgis/products/arcgis-online">ESRI</a>'
+      })
+    } else {
+      currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap'
+      })
     }
-  })
+    currentTileLayer.addTo(map)
+    map.eachLayer(layer => {
+      if (layer instanceof L.TileLayer) {
+        if (settingsStore.mapMode === 'satMap') {
+          layer.getContainer().style.filter = 'contrast(95%) brightness(95%) grayscale(25%)';
+        } else {
+          layer.getContainer().style.filter = 'contrast(120%) brightness(85%) grayscale(70%) invert(100%) hue-rotate(180deg)';
+        }
+      }
+    })
+  }
+  updateMapLayer()
+  watch(() => settingsStore.mapMode, updateMapLayer)
   map.invalidateSize()
   mergedNodes.value.forEach(node => {
     L.marker([node.lat, node.lon])
@@ -204,7 +235,61 @@ onMounted(async () => {
   width: 100%;
   height: calc(100vh - 60px);
   margin-top: 60px;
-  background: #000;
+  background: #181818;
+  z-index: 0;
+}
+
+.map-options {
+  position: fixed;
+  top: 60px;
+  width: 100%;
+  padding: 12px;
+  z-index: 1;
+  // background: rgba($color: #000000, $alpha: 0.8);
+  // backdrop-filter: blur(4px);
+  //   -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+}
+
+.map-select {
+  display: flex;
+  justify-content: center;
+  border-radius: 100px;
+  overflow: hidden;
+  background-color: #181818;
+  padding: 2px;
+  -webkit-box-shadow: 0px 0px 10px 0px rgba(103,234,148,1);
+  -moz-box-shadow: 0px 0px 10px 0px rgba(103,234,148,1);
+  box-shadow: 0px 0px 10px 0px rgba(103,234,148,1);
+
+  &__option {
+    background: #67ea94;
+    color: #000;
+    padding: 6px 14px;
+    cursor: pointer;
+    user-select: none;
+    border-radius: 100px;
+    font-size: 14px;
+    line-height: 18px;
+    transition: all 300ms ease-in-out;
+
+    &--left {
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+
+    &--right {
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+    }
+
+    &--selected {
+      background: #181818;
+      color: #67ea94;
+      font-weight: bold;
+    }
+  }
 }
 
 </style>
