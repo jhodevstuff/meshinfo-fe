@@ -12,9 +12,13 @@
       </div>
       <div class="master-nodes" v-if="enableMasters">
         <div class="master-nodes__container">
-          <div class="master-nodes__option" v-for="masterNode in filteredMasters" :key="masterNode"
+          <div
+            class="master-nodes__option"
+            v-for="masterNode in filteredMasters"
+            :key="masterNode"
             :class="(selectedMasterNode == masterNode && meshDataStore.nodesIndex.length > 1) && 'master-nodes__selected'"
-            @click="selectMasterNode(masterNode)">
+            @click="selectMasterNode(masterNode)"
+          >
             <p class="master-nodes__option--label">
               {{ masterNode }} ({{ meshDataStore.data[masterNode]?.knownNodes?.[0]?.shortName || '----' }})
             </p>
@@ -22,245 +26,383 @@
         </div>
       </div>
       <div class="filter">
-        <div class="filter__item" v-for="filter in userFilters" :key="filter.id"
-          :class="{ 'filter__item--active': selectedFilterId === filter.id }" @mousedown="startPress(filter)"
-          @touchstart="startPress(filter)" @mouseup="cancelPress" @mouseleave="cancelPress" @touchend="cancelPress"
-          @touchcancel="cancelPress" @click="chooseFilter(filter)" @contextmenu.prevent="tryOpenFilterOverlay(filter)">
+        <div
+          class="filter__item"
+          v-for="filter in userFilters"
+          :key="filter.id"
+          :class="{ 'filter__item--active': selectedFilterId === filter.id }"
+          @mousedown="startPress(filter)"
+          @touchstart="startPress(filter)"
+          @mouseup="cancelPress"
+          @mouseleave="cancelPress"
+          @touchend="cancelPress"
+          @touchcancel="cancelPress"
+          @click="chooseFilter(filter)"
+          @contextmenu.prevent="tryOpenFilterOverlay(filter)"
+        >
           {{ filter.name }}
         </div>
-        <div class="filter__item filter__item--add" @click="openFilterOverlay(null)">
-          +
-        </div>
+        <div class="filter__item filter__item--add" @click="openFilterOverlay(null)">+</div>
       </div>
       <div class="loading" v-if="selectedMasterNode === '!ffffffff'">
         Daten werden geladen, bitte warten...
       </div>
-      <div class="nodes__list" v-show="settingsStore.viewMode === 'normal'">
-        <div class="node" v-for="node in filteredAndSortedNodes" :key="node.id"
-          v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)"
-          @click.stop="selectDetails('Gesehen')">
-          <div v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
-            :class="['node__online', getNodeStatus(node)]"></div>
-          <div class="node__icon">
-            <div v-if="nodeImages.includes(node.model)" class="node__icon--img"
-              :style="'background-image: url(src/assets/devices/' + node.model + '.png)'"></div>
-            <div v-if="!nodeImages.includes(node.model)" class="node__icon--img"
-              :style="'background-image: url(src/assets/devices/unknown.svg); background-size: 50%;'"></div>
-            <p>{{ modelShortNames[node.model] || node.model }}</p>
-          </div>
-          <div class="node__info">
-            <div class="node__info--block">
-              <p class="bold large">{{ node.id }}</p>
-              <p v-if="node.id === meshDataStore.data[selectedMasterNode].info.infoFrom"
-                class="bold superlarge lefttop">🛸</p>
-            </div>
-            <div class="node__info--block">
-              <p>👔 {{ node.longName }}</p>
-              <p class="bold">{{ node.shortName }}</p>
-            </div>
-            <div class="node__info--block" v-if="node.batteryLevel || node.voltage">
-              <p v-if="node.batteryLevel">{{ (node.batteryLevel < 35) ? '🪫' : '🔋' }} {{ node.batteryLevel> 100 ? "100"
-                  : node.batteryLevel }} %</p>
-              <p v-if="node.voltage <= 0 && node.batteryLevel >= 100">🔌</p>
-              <p v-else-if="node.voltage">⚡️ {{ node.voltage >= 0 ? node.voltage : 0 }} V</p>
-            </div>
-            <div class="node__info--block" v-if="node.lastHeard || getLastTraceTimestamp(node.id)">
-              <p v-if="node.lastHeard">⏳ {{ formatTimestamp(node.lastHeard) }}</p>
-              <p v-if="getLastTraceTimestamp(node.id)">🔭 {{ getLastTraceTimestamp(node.id) }}</p>
-            </div>
-            <div class="node__info--block" v-if="node.snr || node.hops">
-              <p v-if="node.snr">📡 {{ node.snr }} dB</p>
-              <p v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom">🦘 {{ node.hops }} {{ node.hops
-                === 1 ? 'Hop' : 'Hops' }}</p>
-            </div>
-            <div class="node__info--block" v-if="node.lat && node.lon">
-              <p> 🌍
-                <a v-if="settingsStore.verificationMode" :href="`https://www.google.com/maps?q=${node.lat},${node.lon}`"
-                  target="_blank">
-                  {{ node.lat }}, {{ node.lon }}
-                </a>
-                <span v-else>
-                  Bitte erst verifizieren
-                </span>
-              </p>
-            </div>
-            <p v-if="node.publicKey" class="node__info--block"> <a href="#" @click="copy(node.publicKey)"> 🔑 PublicKey
-                kopieren </a> </p>
-          </div>
-          <div class="node__actions"
-            v-if="selectedNode === node.id && nodeOptionsVisible && (node.power.batteryLevel.length > 1 || getLastTraceTimestamp(node.id) || node.online.length > 1) && selectedDetails == ''">
-            <div class="close close__moremargin" @click.stop="close"></div>
-            <p class="node__actions--headline">Verfügbare Details</p>
-            <div class="node__actions--options">
-              <div class="node__actions--options__item" v-if="node.online.length > 1"
-                @click.stop="selectDetails('Gesehen')">
-                ⏳ Gesehen</div>
-              <div class="node__actions--options__item"
-                v-if="node.power.batteryLevel.length > 1 || node.power.voltage.length > 1"
-                @click.stop="selectDetails('Stromversorgung')">⚡️ Stromversorgung</div>
-              <div class="node__actions--options__item" v-if="getLastTraceTimestamp(node.id)"
-                @click.stop="selectDetails('Traceroutes')">🔭 Traceroutes</div>
-              <div class="node__actions--options__item" v-if="node.lat && node.lon"
-                @click.stop="selectDetails('Position')">🌍 Position</div>
-            </div>
+      <div class="data-wrapper">
+        <div class="details-nodelist" v-if="selectedDetails">
+          <div
+            class="details-nodelist__node"
+            :class="{ 'details-nodelist__node--selected': node.id === selectedNode }"
+            v-for="node in filteredAndSortedNodes"
+            :key="node.id"
+            @click="selectNode(node.id)"
+            @click.stop="selectDetails('Gesehen')"
+          >
+            {{ node.longName }}
           </div>
         </div>
-      </div>
-    </div>
-    <div class="nodes__list nodes__list--compact" v-show="settingsStore.viewMode === 'compact'">
-      <div class="node node__compact" v-for="node in filteredAndSortedNodes" :key="node.id"
-        v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)"
-        @click.stop="selectDetails('Gesehen')">
-        <div v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
-          :class="['node__online node__online--compact', getNodeStatus(node)]">
-        </div>
-        <div class="node__info--block node__info--block__compact">
-          <p>{{ node.longName }}</p>
-          <p class="bold">{{ node.shortName }}</p>
-        </div>
-      </div>
-    </div>
-    <div class="details" v-if="selectedDetails">
-      <div class="details__actions" v-for="node in meshDataStore.data[selectedMasterNode].knownNodes"
-        v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails" @click="selectNode(node.id)">
-        <div class="details__actions--item" :class="selectedDetails === 'Gesehen' && 'details__actions--item__selected'"
-          v-if="node.online.length > 1" @click.stop="selectDetails('Gesehen')">⏳ Gesehen</div>
-        <div class="details__actions--item"
-          :class="selectedDetails === 'Stromversorgung' && 'details__actions--item__selected'"
-          v-if="node.power.batteryLevel.length > 1 || node.power.voltage.length > 1"
-          @click.stop="selectDetails('Stromversorgung')">⚡️ Stromversorgung</div>
-        <div class="details__actions--item"
-          :class="selectedDetails === 'Traceroutes' && 'details__actions--item__selected'"
-          v-if="getLastTraceTimestamp(node.id)" @click.stop="selectDetails('Traceroutes')">🔭 Traceroutes</div>
-        <div class="details__actions--item"
-          :class="selectedDetails === 'Position' && 'details__actions--item__selected'" v-if="node.lat && node.lon"
-          @click.stop="selectDetails('Position')">🌍 Position</div>
-      </div>
-      <p class="details__headline">{{ selectedDetails }}</p>
-      <div class="close close__larger" @click.stop="close"></div>
-      <div class="traceroutes-container" v-if="selectedTraceRoute && selectedDetails === 'Traceroutes'">
-        <div v-for="(tr, index) in selectedTraceRoute" :key="index" class="traceroutes">
-          <p class="traceroutes__time">{{ getTraceTimestamp(tr.timeStamp) }} - Tracroute mit {{ tr.hops }} {{
-            tr.hops
-            === 1 ? 'Hop' : 'Hops' }} {{ tr.hops === 0 ? '(direkt)' : '' }}</p>
-          <div class="traceroutes__row">
-            <p class="traceroutes__row--key">Route Hinweg:</p>
-            <p class="traceroutes__row--value">{{ formatRoute(tr.nodeTraceTo) }}</p>
-          </div>
-          <div class="traceroutes__row">
-            <p class="traceroutes__row--key">Route Rückweg:</p>
-            <p class="traceroutes__row--value">{{ formatRoute(tr.nodeTraceFrom) }}</p>
-          </div>
-        </div>
-      </div>
-      <div v-if="selectedDetails === 'Stromversorgung'" class="graphs">
-        <div class="graph" v-if="processedData.length > 0">
-          <p class="graph__headline">Akku</p>
-          <svg v-if="processedData.length" :viewBox="`0 0 ${graphWidth} ${graphHeight}`"
-            preserveAspectRatio="xMidYMid meet" width="100%" height="auto">
-            <g v-for="(level, index) in yAxisLabels" :key="'y-' + index">
-              <line x1="40" :y1="level.y" :x2="graphWidth - 10" :y2="level.y" stroke="rgb(40,40,40)" stroke-width="1" />
-              <text :x="30" :y="level.y + 4" text-anchor="end" font-size="12" fill="#fff">
-                {{ level.label }}
-              </text>
-            </g>
-            <g v-for="(time, index) in xAxisLabels" :key="'x-' + index">
-              <line :x1="time.x" y1="10" :x2="time.x" :y2="graphHeight - 30" stroke="rgb(40,40,40)" stroke-width="1" />
-              <text :x="time.x" :y="graphHeight - 28" text-anchor="middle" font-size="12" fill="#fff">
-                {{ time.date }}
-              </text>
-              <text :x="time.x" :y="graphHeight - 15" text-anchor="middle" font-size="14" fill="#fff">
-                {{ time.label }}
-              </text>
-            </g>
-            <template v-for="(seg, index) in batterySegments" :key="'seg-' + index">
-              <line :x1="seg.x1" :y1="seg.y1" :x2="seg.x2" :y2="seg.y2" :stroke="seg.color" stroke-width="2" />
-            </template>
-            <circle v-for="(point, index) in processedData" :key="'point-' + index" :cx="point.x" :cy="point.y" r="4"
-              :fill="getBatteryColor(point.level)" @mouseenter="showBatteryTooltip(point)"
-              @mouseleave="hideBatteryTooltip" @touchstart="showBatteryTooltip(point)" @touchend="hideBatteryTooltip" />
-            <text v-if="hoveredBatteryPoint" :x="hoveredBatteryPoint.x + 10" :y="hoveredBatteryPoint.y - 10"
-              font-size="12" fill="#fff" style="pointer-events: none;">
-              {{ hoveredBatteryPoint.level }}%
-            </text>
-          </svg>
-        </div>
-        <div class="graph" v-if="processedVoltageData.length">
-          <p class="graph__headline">Spannung</p>
-          <svg v-if="processedVoltageData.length" :viewBox="`0 0 ${graphWidth} ${graphHeight}`"
-            preserveAspectRatio="xMidYMid meet" width="100%" height="auto">
-            <g v-for="(level, index) in yAxisLabelsVoltage" :key="'vy-' + index">
-              <line x1="40" :y1="level.y" :x2="graphWidth - 10" :y2="level.y" stroke="rgb(40,40,40)" stroke-width="1" />
-              <text :x="30" :y="level.y + 4" text-anchor="end" font-size="12" fill="#fff">
-                {{ level.label }}
-              </text>
-            </g>
-            <g v-for="(time, index) in xAxisLabelsVoltage" :key="'vx-' + index">
-              <line :x1="time.x" y1="10" :x2="time.x" :y2="graphHeight - 30" stroke="rgb(40,40,40)" stroke-width="1" />
-              <text :x="time.x" :y="graphHeight - 28" text-anchor="middle" font-size="12" fill="#fff">
-                {{ time.date }}
-              </text>
-              <text :x="time.x" :y="graphHeight - 15" text-anchor="middle" font-size="14" fill="#fff">
-                {{ time.label }}
-              </text>
-            </g>
-            <template v-for="(seg, index) in voltageSegments" :key="'vseg-' + index">
-              <line :x1="seg.x1" :y1="seg.y1" :x2="seg.x2" :y2="seg.y2" stroke="#fff" stroke-width="2" />
-            </template>
-            <circle v-for="(point, idx) in processedVoltageData" :key="'volt-' + idx" :cx="point.x" :cy="point.y" r="4"
-              :fill="getVoltageColor()" @mouseenter="showVoltageTooltip(point)" @mouseleave="hideVoltageTooltip"
-              @touchstart="showVoltageTooltip(point)" @touchend="hideVoltageTooltip" />
-            <!-- <text v-if="hoveredVoltagePoint" :x="hoveredVoltagePoint.x + 10" :y="hoveredVoltagePoint.y - 10"
-              font-size="14" fill="#fff" style="pointer-events: none;">
-              {{ hoveredVoltagePoint.level }} V
-            </text> -->
-          </svg>
-        </div>
-      </div>
-      <div v-if="selectedDetails === 'Gesehen'">
-        <div class="online-state">
-          <div class="online-state__left">
-            <div class="days">
-              <p class="days__item" v-for="day in getOnlineHistory(selectedNode).days"> {{ day }}</p>
-            </div>
-          </div>
-          <div class="online-state__right">
-            <div class="hours">
-              <p class="hours__item">0</p>
-              <p class="hours__item">1</p>
-              <p class="hours__item">2</p>
-              <p class="hours__item">3</p>
-              <p class="hours__item">4</p>
-              <p class="hours__item">5</p>
-              <p class="hours__item">6</p>
-              <p class="hours__item">7</p>
-              <p class="hours__item">8</p>
-              <p class="hours__item">9</p>
-              <p class="hours__item">10</p>
-              <p class="hours__item">11</p>
-              <p class="hours__item">12</p>
-              <p class="hours__item">13</p>
-              <p class="hours__item">14</p>
-              <p class="hours__item">15</p>
-              <p class="hours__item">16</p>
-              <p class="hours__item">17</p>
-              <p class="hours__item">18</p>
-              <p class="hours__item">19</p>
-              <p class="hours__item">20</p>
-              <p class="hours__item">21</p>
-              <p class="hours__item">22</p>
-              <p class="hours__item">23</p>
-            </div>
-            <div class="fields">
-              <div class="fields__row" v-for="day in getOnlineHistory(selectedNode).times">
-                <div class="fields__row--item" v-for="h in day" :class="[h && 'state-online']"></div>
+        <div class="data">
+          <div class="nodes__list" v-show="settingsStore.viewMode === 'normal'">
+            <div
+              class="node"
+              v-for="node in filteredAndSortedNodes"
+              :key="node.id"
+              v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails"
+              @click="selectNode(node.id)"
+              @click.stop="selectDetails('Gesehen')"
+            >
+              <div
+                v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
+                :class="['node__online', getNodeStatus(node)]"
+              ></div>
+              <div class="node__icon">
+                <div
+                  v-if="nodeImages.includes(node.model)"
+                  class="node__icon--img"
+                  :style="'background-image: url(src/assets/devices/' + node.model + '.png)'"
+                ></div>
+                <div
+                  v-if="!nodeImages.includes(node.model)"
+                  class="node__icon--img"
+                  :style="'background-image: url(src/assets/devices/unknown.svg); background-size: 50%;'"
+                ></div>
+                <p>{{ modelShortNames[node.model] || node.model }}</p>
+              </div>
+              <div class="node__info">
+                <div class="node__info--block">
+                  <p class="bold large">{{ node.id }}</p>
+                  <p
+                    v-if="node.id === meshDataStore.data[selectedMasterNode].info.infoFrom"
+                    class="bold superlarge lefttop"
+                  >
+                    🛸
+                  </p>
+                </div>
+                <div class="node__info--block">
+                  <p>👔 {{ node.longName }}</p>
+                  <p class="bold">{{ node.shortName }}</p>
+                </div>
+                <div class="node__info--block" v-if="node.batteryLevel || node.voltage">
+                  <p v-if="node.batteryLevel">
+                    {{ (node.batteryLevel < 35) ? '🪫' : '🔋' }}
+                    {{ node.batteryLevel > 100 ? "100" : node.batteryLevel }} %
+                  </p>
+                  <p v-if="node.voltage <= 0 && node.batteryLevel >= 100">🔌</p>
+                  <p v-else-if="node.voltage">⚡️ {{ node.voltage >= 0 ? node.voltage : 0 }} V</p>
+                </div>
+                <div class="node__info--block" v-if="node.lastHeard || getLastTraceTimestamp(node.id)">
+                  <p v-if="node.lastHeard">⏳ {{ formatTimestamp(node.lastHeard) }}</p>
+                  <p v-if="getLastTraceTimestamp(node.id)">🔭 {{ getLastTraceTimestamp(node.id) }}</p>
+                </div>
+                <div class="node__info--block" v-if="node.snr || node.hops">
+                  <p v-if="node.snr">📡 {{ node.snr }} dB</p>
+                  <p v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom">
+                    🦘 {{ node.hops }} {{ node.hops === 1 ? 'Hop' : 'Hops' }}
+                  </p>
+                </div>
+                <div class="node__info--block" v-if="node.lat && node.lon">
+                  <p>
+                    🌍
+                    <a
+                      v-if="settingsStore.verificationMode"
+                      :href="`https://www.google.com/maps?q=${node.lat},${node.lon}`"
+                      target="_blank"
+                    >
+                      {{ node.lat }}, {{ node.lon }}
+                    </a>
+                    <span v-else>Bitte erst verifizieren</span>
+                  </p>
+                </div>
+                <p v-if="node.publicKey" class="node__info--block">
+                  <a href="#" @click="copy(node.publicKey)">🔑 PublicKey kopieren</a>
+                </p>
+              </div>
+              <div
+                class="node__actions"
+                v-if="
+                  selectedNode === node.id &&
+                  nodeOptionsVisible &&
+                  (node.power.batteryLevel.length > 1 || getLastTraceTimestamp(node.id) || node.online.length > 1) &&
+                  selectedDetails == ''
+                "
+              >
+                <div class="close close__moremargin" @click.stop="close"></div>
+                <p class="node__actions--headline">Verfügbare Details</p>
+                <div class="node__actions--options">
+                  <div
+                    class="node__actions--options__item"
+                    v-if="node.online.length > 1"
+                    @click.stop="selectDetails('Gesehen')"
+                  >
+                    ⏳ Gesehen
+                  </div>
+                  <div
+                    class="node__actions--options__item"
+                    v-if="node.power.batteryLevel.length > 1 || node.power.voltage.length > 1"
+                    @click.stop="selectDetails('Stromversorgung')"
+                  >
+                    ⚡️ Stromversorgung
+                  </div>
+                  <div
+                    class="node__actions--options__item"
+                    v-if="getLastTraceTimestamp(node.id)"
+                    @click.stop="selectDetails('Traceroutes')"
+                  >
+                    🔭 Traceroutes
+                  </div>
+                  <div
+                    class="node__actions--options__item"
+                    v-if="node.lat && node.lon"
+                    @click.stop="selectDetails('Position')"
+                  >
+                    🌍 Position
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+          <div class="nodes__list nodes__list--compact" v-show="settingsStore.viewMode === 'compact'">
+            <div
+              class="node node__compact"
+              v-for="node in filteredAndSortedNodes"
+              :key="node.id"
+              v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails"
+              @click="selectNode(node.id)"
+              @click.stop="selectDetails('Gesehen')"
+            >
+              <div
+                v-if="node.id !== meshDataStore.data[selectedMasterNode].info.infoFrom"
+                :class="['node__online node__online--compact', getNodeStatus(node)]"
+              ></div>
+              <div class="node__info--block node__info--block__compact">
+                <p>{{ node.longName }}</p>
+                <p class="bold">{{ node.shortName }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="details" v-if="selectedDetails">
+            <div
+              class="details__actions"
+              v-for="node in meshDataStore.data[selectedMasterNode].knownNodes"
+              :key="node.id"
+              v-show="(node?.id === selectedNode && selectedDetails) || !selectedDetails"
+              @click="selectNode(node.id)"
+            >
+              <div
+                class="details__actions--item"
+                :class="selectedDetails === 'Gesehen' && 'details__actions--item__selected'"
+                v-if="node.online.length > 1"
+                @click.stop="selectDetails('Gesehen')"
+              >
+                ⏳ Gesehen
+              </div>
+              <div
+                class="details__actions--item"
+                :class="selectedDetails === 'Stromversorgung' && 'details__actions--item__selected'"
+                v-if="node.power.batteryLevel.length > 1 || node.power.voltage.length > 1"
+                @click.stop="selectDetails('Stromversorgung')"
+              >
+                ⚡️ Stromversorgung
+              </div>
+              <div
+                class="details__actions--item"
+                :class="selectedDetails === 'Traceroutes' && 'details__actions--item__selected'"
+                v-if="getLastTraceTimestamp(node.id)"
+                @click.stop="selectDetails('Traceroutes')"
+              >
+                🔭 Traceroutes
+              </div>
+              <div
+                class="details__actions--item"
+                :class="selectedDetails === 'Position' && 'details__actions--item__selected'"
+                v-if="node.lat && node.lon"
+                @click.stop="selectDetails('Position')"
+              >
+                🌍 Position
+              </div>
+            </div>
+            <p class="details__headline">{{ selectedDetails }}</p>
+            <div class="close close__larger" @click.stop="close"></div>
+            <div class="traceroutes-container" v-if="selectedTraceRoute && selectedDetails === 'Traceroutes'">
+              <div v-for="(tr, index) in selectedTraceRoute" :key="index" class="traceroutes">
+                <p class="traceroutes__time">
+                  {{ getTraceTimestamp(tr.timeStamp) }} - Tracroute mit {{ tr.hops }}
+                  {{ tr.hops === 1 ? 'Hop' : 'Hops' }}
+                  {{ tr.hops === 0 ? '(direkt)' : '' }}
+                </p>
+                <div class="traceroutes__row">
+                  <p class="traceroutes__row--key">Route Hinweg:</p>
+                  <p class="traceroutes__row--value">{{ formatRoute(tr.nodeTraceTo) }}</p>
+                </div>
+                <div class="traceroutes__row">
+                  <p class="traceroutes__row--key">Route Rückweg:</p>
+                  <p class="traceroutes__row--value">{{ formatRoute(tr.nodeTraceFrom) }}</p>
+                </div>
+              </div>
+            </div>
+            <div v-if="selectedDetails === 'Stromversorgung'" class="graphs">
+              <div class="graph" v-if="processedData.length > 0">
+                <p class="graph__headline">Akku</p>
+                <svg
+                  v-if="processedData.length"
+                  :viewBox="`0 0 ${graphWidth} ${graphHeight}`"
+                  preserveAspectRatio="xMidYMid meet"
+                  width="100%"
+                  height="auto"
+                >
+                  <g v-for="(level, index) in yAxisLabels" :key="'y-' + index">
+                    <line x1="40" :y1="level.y" :x2="graphWidth - 10" :y2="level.y" stroke="rgb(40,40,40)" stroke-width="1" />
+                    <text :x="30" :y="level.y + 4" text-anchor="end" font-size="12" fill="#fff">
+                      {{ level.label }}
+                    </text>
+                  </g>
+                  <g v-for="(time, index) in xAxisLabels" :key="'x-' + index">
+                    <line :x1="time.x" y1="10" :x2="time.x" :y2="graphHeight - 30" stroke="rgb(40,40,40)" stroke-width="1" />
+                    <text :x="time.x" :y="graphHeight - 28" text-anchor="middle" font-size="12" fill="#fff">
+                      {{ time.date }}
+                    </text>
+                    <text :x="time.x" :y="graphHeight - 15" text-anchor="middle" font-size="14" fill="#fff">
+                      {{ time.label }}
+                    </text>
+                  </g>
+                  <template v-for="(seg, index) in batterySegments" :key="'seg-' + index">
+                    <line :x1="seg.x1" :y1="seg.y1" :x2="seg.x2" :y2="seg.y2" :stroke="seg.color" stroke-width="2" />
+                  </template>
+                  <circle
+                    v-for="(point, index) in processedData"
+                    :key="'point-' + index"
+                    :cx="point.x"
+                    :cy="point.y"
+                    r="4"
+                    :fill="getBatteryColor(point.level)"
+                    @mouseenter="showBatteryTooltip(point)"
+                    @mouseleave="hideBatteryTooltip"
+                    @touchstart="showBatteryTooltip(point)"
+                    @touchend="hideBatteryTooltip"
+                  />
+                  <text
+                    v-if="hoveredBatteryPoint"
+                    :x="hoveredBatteryPoint.x + 10"
+                    :y="hoveredBatteryPoint.y - 10"
+                    font-size="12"
+                    fill="#fff"
+                    style="pointer-events: none;"
+                  >
+                    {{ hoveredBatteryPoint.level }}%
+                  </text>
+                </svg>
+              </div>
+              <div class="graph" v-if="processedVoltageData.length">
+                <p class="graph__headline">Spannung</p>
+                <svg
+                  v-if="processedVoltageData.length"
+                  :viewBox="`0 0 ${graphWidth} ${graphHeight}`"
+                  preserveAspectRatio="xMidYMid meet"
+                  width="100%"
+                  height="auto"
+                >
+                  <g v-for="(level, index) in yAxisLabelsVoltage" :key="'vy-' + index">
+                    <line x1="40" :y1="level.y" :x2="graphWidth - 10" :y2="level.y" stroke="rgb(40,40,40)" stroke-width="1" />
+                    <text :x="30" :y="level.y + 4" text-anchor="end" font-size="12" fill="#fff">
+                      {{ level.label }}
+                    </text>
+                  </g>
+                  <g v-for="(time, index) in xAxisLabelsVoltage" :key="'vx-' + index">
+                    <line :x1="time.x" y1="10" :x2="time.x" :y2="graphHeight - 30" stroke="rgb(40,40,40)" stroke-width="1" />
+                    <text :x="time.x" :y="graphHeight - 28" text-anchor="middle" font-size="12" fill="#fff">
+                      {{ time.date }}
+                    </text>
+                    <text :x="time.x" :y="graphHeight - 15" text-anchor="middle" font-size="14" fill="#fff">
+                      {{ time.label }}
+                    </text>
+                  </g>
+                  <template v-for="(seg, index) in voltageSegments" :key="'vseg-' + index">
+                    <line :x1="seg.x1" :y1="seg.y1" :x2="seg.x2" :y2="seg.y2" stroke="#fff" stroke-width="2" />
+                  </template>
+                  <circle
+                    v-for="(point, idx) in processedVoltageData"
+                    :key="'volt-' + idx"
+                    :cx="point.x"
+                    :cy="point.y"
+                    r="4"
+                    :fill="getVoltageColor()"
+                    @mouseenter="showVoltageTooltip(point)"
+                    @mouseleave="hideVoltageTooltip"
+                    @touchstart="showVoltageTooltip(point)"
+                    @touchend="hideVoltageTooltip"
+                  />
+                </svg>
+              </div>
+            </div>
+            <div v-if="selectedDetails === 'Gesehen'">
+              <div class="online-state">
+                <div class="online-state__left">
+                  <div class="days">
+                    <p class="days__item" v-for="day in getOnlineHistory(selectedNode).days">
+                      {{ day }}
+                    </p>
+                  </div>
+                </div>
+                <div class="online-state__right">
+                  <div class="hours">
+                    <p class="hours__item">0</p>
+                    <p class="hours__item">1</p>
+                    <p class="hours__item">2</p>
+                    <p class="hours__item">3</p>
+                    <p class="hours__item">4</p>
+                    <p class="hours__item">5</p>
+                    <p class="hours__item">6</p>
+                    <p class="hours__item">7</p>
+                    <p class="hours__item">8</p>
+                    <p class="hours__item">9</p>
+                    <p class="hours__item">10</p>
+                    <p class="hours__item">11</p>
+                    <p class="hours__item">12</p>
+                    <p class="hours__item">13</p>
+                    <p class="hours__item">14</p>
+                    <p class="hours__item">15</p>
+                    <p class="hours__item">16</p>
+                    <p class="hours__item">17</p>
+                    <p class="hours__item">18</p>
+                    <p class="hours__item">19</p>
+                    <p class="hours__item">20</p>
+                    <p class="hours__item">21</p>
+                    <p class="hours__item">22</p>
+                    <p class="hours__item">23</p>
+                  </div>
+                  <div class="fields">
+                    <div class="fields__row" v-for="day in getOnlineHistory(selectedNode).times">
+                      <div class="fields__row--item" v-for="h in day" :class="[h && 'state-online']"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="tiny-map" v-if="selectedDetails === 'Position'">
+              <TinyMap v-if="settingsStore.verificationMode" :node="getSelectedNode()" @openFullMap="openFullMap" />
+              <p v-else>Bitte erst verifizieren</p>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="tiny-map" v-if="selectedDetails === 'Position'">
-        <TinyMap :node="getSelectedNode()" @openFullMap="openFullMap" />
       </div>
     </div>
     <div class="filter-overlay" v-if="showFilterOverlay">
@@ -270,9 +412,13 @@
       </div>
       <div class="master-nodes margin-12" v-if="enableMasters">
         <div class="master-nodes__container">
-          <div class="master-nodes__option" v-for="masterNode in filteredMasters" :key="masterNode"
+          <div
+            class="master-nodes__option"
+            v-for="masterNode in filteredMasters"
+            :key="masterNode"
             :class="(selectedMasterNode == masterNode && meshDataStore.nodesIndex.length > 1) && 'master-nodes__selected'"
-            @click="selectMasterNode(masterNode)">
+            @click="selectMasterNode(masterNode)"
+          >
             <p class="master-nodes__option--label">
               {{ masterNode }} ({{ meshDataStore.data[masterNode]?.knownNodes?.[0]?.shortName || '----' }})
             </p>
@@ -281,41 +427,68 @@
       </div>
       <div class="filter-overlay__actions">
         <div class="filter-overlay__actions--part">
-          <input class="filter-overlay__actions--part__item" type="text" v-model="tempFilterName"
-            :disabled="isDefaultFilter" />
+          <input
+            class="filter-overlay__actions--part__item"
+            type="text"
+            v-model="tempFilterName"
+            :disabled="isDefaultFilter"
+          />
         </div>
         <div class="filter-overlay__actions--part filter-overlay__actions--part__more">
           <div class="filter-overlay__actions--part__item" :class="overlaySaveClass" @click.stop="saveFilter">
             Speichern
           </div>
-          <div class="filter-overlay__actions--part__item" v-if="isEditing && !isDefaultFilter"
-            @click.stop="deleteFilter">
+          <div
+            class="filter-overlay__actions--part__item"
+            v-if="isEditing && !isDefaultFilter"
+            @click.stop="deleteFilter"
+          >
             Löschen
           </div>
         </div>
       </div>
       <div class="filter-overlay__body">
         <div class="filter-overlay__body--list">
-          <h3 class="filter-overlay__body--list__label">Angezeigte Nodes ({{ nodesInFilter.length }})</h3>
-          <div class="filter-overlay__body--list__item" v-for="node in nodesInFilter" :key="node.id"
-            @click="removeNodeFromFilter(node)">
+          <h3 class="filter-overlay__body--list__label">
+            Angezeigte Nodes ({{ nodesInFilter.length }})
+          </h3>
+          <div
+            class="filter-overlay__body--list__item"
+            v-for="node in nodesInFilter"
+            :key="node.id"
+            @click="removeNodeFromFilter(node)"
+          >
             {{ node.longName }}
           </div>
-          <p v-if="nodesInFilter.length === 0">Wähle verfügbare Nodes um diese im Filter anzuzeigen.</p>
+          <p v-if="nodesInFilter.length === 0">
+            Wähle verfügbare Nodes um diese im Filter anzuzeigen.
+          </p>
         </div>
         <div class="filter-overlay__body--list">
-          <h3 class="filter-overlay__body--list__label">Verfügbar für Filter ({{ availableNodes.length }})</h3>
-          <div class="filter-overlay__body--list__item" v-for="node in availableNodes" :key="node.id"
-            @click="addNodeToFilter(node)">
+          <h3 class="filter-overlay__body--list__label">
+            Verfügbar für Filter ({{ availableNodes.length }})
+          </h3>
+          <div
+            class="filter-overlay__body--list__item"
+            v-for="node in availableNodes"
+            :key="node.id"
+            @click="addNodeToFilter(node)"
+          >
             {{ node.longName }}
           </div>
         </div>
       </div>
     </div>
   </div>
-  <div class="footnote" v-if="!selectedDetails && meshDataStore.data[selectedMasterNode] && !showFilterOverlay">
+  <div
+    class="footnote"
+    v-if="!selectedDetails && meshDataStore.data[selectedMasterNode] && !showFilterOverlay"
+  >
     <p>meshinfo (frontend) version: 2024-02-04</p>
-    <p>entwickelt mit ❤️ und 🍷 von <a href="http://github.com/jhodevstuff">joshua hoffmann</a></p>
+    <p>
+      entwickelt mit ❤️ und 🍷 von
+      <a href="http://github.com/jhodevstuff">joshua hoffmann</a>
+    </p>
   </div>
 </template>
 
@@ -1285,7 +1458,6 @@ onUnmounted(() => clearInterval(intervalId))
 }
 
 .details {
-  margin: 0 12px;
   border-radius: 3px;
   position: relative;
 
@@ -1609,4 +1781,56 @@ onUnmounted(() => clearInterval(intervalId))
     text-decoration: underline;
   }
 }
+
+.data-wrapper {
+  display: flex;
+  width: 100%;
+
+  @media screen and (min-width: 1280px) {
+    flex-direction: row;
+    gap: 18px;
+  }
+}
+
+.data {
+  width: 100%;
+}
+
+.details-nodelist {
+  width: 20%;
+  display: none;
+
+  @media screen and (min-width: 1280px) {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    height: fit-content;
+    max-height: 70vh;
+    overflow-y: auto;
+    border-radius: 3px;
+    // background-color: rgb(40, 40, 40);
+    padding: 4px 0;
+  }
+
+  &__node {
+    font-size: 14px;
+    padding: 8px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: all 200ms ease-in-out;
+    color: rgba($color: #ffffff, $alpha: 0.8);
+    
+    &--selected {
+      margin: 0 0px;
+      padding: 8px 8px;
+      border-left: 2px solid rgb(255, 255, 255);
+      font-weight: bold;
+      color: rgba($color: #ffffff, $alpha: 1);
+      background-color: rgba($color: #181818, $alpha: 0.5);
+    }
+  }
+}
+
 </style>
