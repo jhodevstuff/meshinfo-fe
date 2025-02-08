@@ -1335,7 +1335,7 @@ onUnmounted(() => clearInterval(intervalId))
     justify-content: center;
     flex-direction: column;
     font-size: 10px;
-    border-right: 1px solid #fff;
+    // border-right: 1px solid #fff;
     overflow: hidden;
 
     &--img {
@@ -1668,7 +1668,7 @@ onUnmounted(() => clearInterval(intervalId))
   left: 0;
   width: 100%;
   height: calc(100% - 60px);
-  background: #181818;
+  background: rgb(15, 15, 15);
   display: flex;
   flex-direction: column;
 
