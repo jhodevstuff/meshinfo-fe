@@ -259,7 +259,7 @@ watch(() => settingsStore.mapMode, () => {
   width: 100%;
   height: calc(100vh - 60px);
   margin-top: 60px;
-  background: #181818;
+  background: rgb(25, 25, 25);
   z-index: 0;
 }
 
@@ -278,7 +278,7 @@ watch(() => settingsStore.mapMode, () => {
   justify-content: center;
   border-radius: 100px;
   overflow: hidden;
-  background-color: #181818;
+  background-color: rgb(25, 25, 25);
   padding: 2px;
   box-shadow: 0px 0px 10px 0px rgba(103, 234, 148, 1);
 

@@ -1,48 +1,50 @@
 <template>
   <div>
     <div class="nodes" v-if="selectedMasterNode">
-      <div class="nodes__info">
-        <p v-if="meshDataStore.data[selectedMasterNode]">
-          Nodes gesamt: {{ meshDataStore.data[selectedMasterNode].knownNodes.length }}
-        </p>
-        <div class="nodes__info--update">
-          <p>{{ elapsedSeconds }}</p>
-          <p>Sekunden seit Update {{ elapsedSeconds > 3600 ? '👀' : null }}</p>
-        </div>
-      </div>
-      <div class="master-nodes" v-if="enableMasters">
-        <div class="master-nodes__container">
-          <div
-            class="master-nodes__option"
-            v-for="masterNode in filteredMasters"
-            :key="masterNode"
-            :class="(selectedMasterNode == masterNode && meshDataStore.nodesIndex.length > 1) && 'master-nodes__selected'"
-            @click="selectMasterNode(masterNode)"
-          >
-            <p class="master-nodes__option--label">
-              {{ masterNode }} ({{ meshDataStore.data[masterNode]?.knownNodes?.[0]?.shortName || '----' }})
-            </p>
+      <div class="top-control">
+        <div class="nodes__info">
+          <p v-if="meshDataStore.data[selectedMasterNode]">
+            Nodes gesamt: {{ meshDataStore.data[selectedMasterNode].knownNodes.length }}
+          </p>
+          <div class="nodes__info--update">
+            <p>{{ elapsedSeconds }}</p>
+            <p>Sekunden seit Update {{ elapsedSeconds > 3600 ? '👀' : null }}</p>
           </div>
         </div>
-      </div>
-      <div class="filter">
-        <div
-          class="filter__item"
-          v-for="filter in userFilters"
-          :key="filter.id"
-          :class="{ 'filter__item--active': selectedFilterId === filter.id }"
-          @mousedown="startPress(filter)"
-          @touchstart="startPress(filter)"
-          @mouseup="cancelPress"
-          @mouseleave="cancelPress"
-          @touchend="cancelPress"
-          @touchcancel="cancelPress"
-          @click="chooseFilter(filter)"
-          @contextmenu.prevent="tryOpenFilterOverlay(filter)"
-        >
-          {{ filter.name }}
+        <div class="master-nodes" v-if="enableMasters">
+          <div class="master-nodes__container">
+            <div
+              class="master-nodes__option"
+              v-for="masterNode in filteredMasters"
+              :key="masterNode"
+              :class="(selectedMasterNode == masterNode && meshDataStore.nodesIndex.length > 1) && 'master-nodes__selected'"
+              @click="selectMasterNode(masterNode)"
+            >
+              <p class="master-nodes__option--label">
+                {{ masterNode }} ({{ meshDataStore.data[masterNode]?.knownNodes?.[0]?.shortName || '----' }})
+              </p>
+            </div>
+          </div>
         </div>
-        <div class="filter__item filter__item--add" @click="openFilterOverlay(null)">+</div>
+        <div class="filter">
+          <div
+            class="filter__item"
+            v-for="filter in userFilters"
+            :key="filter.id"
+            :class="{ 'filter__item--active': selectedFilterId === filter.id }"
+            @mousedown="startPress(filter)"
+            @touchstart="startPress(filter)"
+            @mouseup="cancelPress"
+            @mouseleave="cancelPress"
+            @touchend="cancelPress"
+            @touchcancel="cancelPress"
+            @click="chooseFilter(filter)"
+            @contextmenu.prevent="tryOpenFilterOverlay(filter)"
+          >
+            {{ filter.name }}
+          </div>
+          <div class="filter__item filter__item--add" @click="openFilterOverlay(null)">+</div>
+        </div>
       </div>
       <div class="loading" v-if="selectedMasterNode === '!ffffffff'">
         Daten werden geladen, bitte warten...
@@ -484,7 +486,7 @@
     class="footnote"
     v-if="!selectedDetails && meshDataStore.data[selectedMasterNode] && !showFilterOverlay"
   >
-    <p>meshinfo (frontend) version: 2024-02-04</p>
+    <p>meshinfo ui version: 2024-02-08</p>
     <p>
       entwickelt mit ❤️ und 🍷 von
       <a href="http://github.com/jhodevstuff">joshua hoffmann</a>
@@ -1205,6 +1207,7 @@ onUnmounted(() => clearInterval(intervalId))
   gap: 16px;
   margin: 12px;
   margin-top: 80px;
+  zoom: 85%;
 
   &__info {
     margin: 12px 0;
@@ -1251,7 +1254,7 @@ onUnmounted(() => clearInterval(intervalId))
 
   &__container {
     width: 100%;
-    background-color: rgb(40, 40, 40);
+    background-color: rgb(25, 25, 25);
     padding: 6px;
     display: flex;
     flex-wrap: wrap;
@@ -1283,7 +1286,7 @@ onUnmounted(() => clearInterval(intervalId))
 
 .node {
   width: calc(100% - 2 * 12px);
-  background-color: rgb(40, 40, 40);
+  background-color: rgb(25, 25, 25);
   display: flex;
   gap: 8px;
   padding: 12px;
@@ -1374,7 +1377,7 @@ onUnmounted(() => clearInterval(intervalId))
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    background-color: rgba(40, 40, 40, 0.5);
+    background-color: rgba(25, 25, 25, 0.5);
     backdrop-filter: blur(4px);
       -webkit-backdrop-filter: blur(4px);
     
@@ -1473,10 +1476,11 @@ onUnmounted(() => clearInterval(intervalId))
     flex-wrap: wrap;
     margin: 32px 0;
     margin-bottom: 28px;
+    width: calc(100% - 28px - 6px);
 
     &--item {
-      border: 1px solid rgb(40, 40, 40);
-      background-color: rgb(40, 40, 40);
+      border: 1px solid rgb(25, 25, 25);
+      background-color: rgb(25, 25, 25);
       padding: 10px 12px;
       font-size: 16px;
       border-radius: 3px;
@@ -1581,7 +1585,7 @@ onUnmounted(() => clearInterval(intervalId))
     &__item {
       height: 16px;
       font-size: 14px;
-      border-bottom: 1px solid rgb(40, 40, 40);
+      border-bottom: 1px solid rgb(25, 25, 25);
       margin-bottom: 6px;
       padding-bottom: 4px;
       padding-top: 2px;
@@ -1612,12 +1616,12 @@ onUnmounted(() => clearInterval(intervalId))
       flex-direction: row;
       justify-content: space-between;
       gap: 1px;
-      border-bottom: 1px solid rgb(40, 40, 40);
+      border-bottom: 1px solid rgb(25, 25, 25);
       margin-bottom: 6px;
       padding-bottom: 6px;
 
       &--item {
-        background-color:  rgb(40, 40, 40);
+        background-color:  rgb(25, 25, 25);
         width: 16px;
         height: 16px;
         font-size: 14px;
@@ -1638,18 +1642,18 @@ onUnmounted(() => clearInterval(intervalId))
   font-size: 16px;
 
   &__item {
-    background-color: rgb(40, 40, 40);
+    background-color: rgb(25, 25, 25);
     padding: 12px 16px;
     border-radius: 3px;
     cursor: pointer;
     font-size: 16px;
     transition: border 0.2s, background-color 0.2s;
-    border: 1px solid rgb(40, 40, 40);
+    border: 1px solid rgb(25, 25, 25);
     user-select: none;
   }
 
   &__item--active {
-    border: 1px solid rgb(80, 80, 80);
+    border: 1px solid rgb(70, 70, 70);
   }
 
   &__item--add {
@@ -1701,7 +1705,7 @@ onUnmounted(() => clearInterval(intervalId))
       }
 
       &__item {
-        background-color: rgb(40, 40, 40);
+        background-color: rgb(25, 25, 25);
         padding: 12px 16px;
         border-radius: 3px;
         cursor: pointer;
@@ -1753,7 +1757,7 @@ onUnmounted(() => clearInterval(intervalId))
       }
 
       &__item {
-        background-color: rgb(40, 40, 40);
+        background-color: rgb(25, 25, 25);
         padding: 8px;
         border-radius: 3px;
         cursor: pointer;
@@ -1776,6 +1780,7 @@ onUnmounted(() => clearInterval(intervalId))
   opacity: 0.6;
   font-size: 12px !important;
   font-family: monospace;
+  zoom: 80%;
 
   a {
     text-decoration: underline;
@@ -1797,40 +1802,66 @@ onUnmounted(() => clearInterval(intervalId))
 }
 
 .details-nodelist {
-  width: 20%;
   display: none;
-
+  width: 20%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(136, 136, 136, 0) rgba(68, 68, 68, 0);
+  
+  &::-webkit-scrollbar {
+    width: 8px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  &:hover,
+  &:active {
+    scrollbar-color: #888 #444;
+  }
+  &:hover::-webkit-scrollbar,
+  &:active::-webkit-scrollbar {
+  opacity: 1;
+  }
+  
   @media screen and (min-width: 1280px) {
     display: flex;
     flex-direction: column;
     gap: 2px;
     height: fit-content;
-    max-height: 70vh;
-    overflow-y: auto;
+    max-height: 85vh;
     border-radius: 3px;
-    // background-color: rgb(40, 40, 40);
     padding: 4px 0;
   }
-
+  
   &__node {
-    font-size: 14px;
+    font-size: 16px;
     padding: 8px 10px;
     cursor: pointer;
     display: flex;
     align-items: center;
-    cursor: pointer;
     transition: all 200ms ease-in-out;
-    color: rgba($color: #ffffff, $alpha: 0.8);
+    color: rgba(255, 255, 255, 0.8);
     
+    &:hover,
     &--selected {
-      margin: 0 0px;
       padding: 8px 8px;
-      border-left: 2px solid rgb(255, 255, 255);
+      border-left: 2px solid #fff;
       font-weight: bold;
-      color: rgba($color: #ffffff, $alpha: 1);
-      background-color: rgba($color: #181818, $alpha: 0.5);
+      color: rgba(255, 255, 255, 1);
+      background-color: rgba(25, 25, 25, 0);
     }
   }
+}
+
+.top-control {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background-color: rgb(15, 15, 15);
+  margin: -12px;
+  margin-bottom: -6px;
+  padding: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgb(40, 40, 40);
 }
 
 </style>
