@@ -24,7 +24,7 @@ A versatile dashboard that displays the current status of your Meshtastic networ
 - Multiple master nodes can provide their data in a single dashboard
 - Shortcut to an external map (MQTT, etc.)
 
-![screenshot](screenshots/screenshot-1.jpg)
+![screenshot](screenshots/screenshots.jpg)
 
 ### Installation
 1. Clone the repository: `git clone https://github.com/jhodevstuff/meshinfo-fe.git`
@@ -56,7 +56,6 @@ favicon.ico
 index.html
 maplink.json
 ```
-
 Congratulations! Hope it works!
 
 ### Future Plans of the Developer
@@ -67,8 +66,4 @@ Congratulations! Hope it works!
 - Importance score for each node in the network
 - User notification when a node goes offline
 
-### Additional Screenshots
-
-![screenshot](screenshots/screenshots.jpg)
-
-###### Joshua Hoffmann / 2024-12-22
+###### Joshua Hoffmann / 2024-02-24
