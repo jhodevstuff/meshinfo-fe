@@ -14,15 +14,16 @@ A versatile dashboard that displays the current status of your Meshtastic networ
   - GPS coordinates with a Google Maps link
   - Public Key
 - **Detailed view of collected data within a certain time period**
-  - Graphical overview of uptime
-  - Graphical representation of battery level
-  - Information from automatically executed traceroutes
+  - Overview of battery/voltage level, traceroutes, online-state and position map preview
+- **Map**
+  - Node map
+  - Visulized traceroutes
+  - Detailed infos
 - **Configurable views**
   - Detailed or compact view
   - Sort the nodes
   - Add filters to only see specific nodes
 - Multiple master nodes can provide their data in a single dashboard
-- Shortcut to an external map (MQTT, etc.)
 
 ![screenshot](screenshots/screenshots.jpg)
 
@@ -60,10 +61,9 @@ Congratulations! Hope it works!
 
 ### Future Plans of the Developer
 - Currently, the language is German, but an English option is planned
-- Password protection for access
+- Password protection for access (at this moment the sensible data can be unlocked by clicking the logo 5 times)
 - Possibly remote administration
-- Potentially better visualization of traceroutes
 - Importance score for each node in the network
-- User notification when a node goes offline
+- User notification when a node goes offline (monitoring script is in testing)
 
 ###### Joshua Hoffmann / 2024-02-24
